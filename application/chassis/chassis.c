@@ -121,13 +121,7 @@ static void ChassisStateSet()
 
 static void SendPowerData()
 {
-    if(cap->cap_msg.vol<18)
-    power_data=chassis_cmd_recv.power_limit+10;
-    else
-    {
-        power_data=chassis_cmd_recv.power_limit;
-    }
-    
+    power_data=chassis_cmd_recv.power_limit+27;    
     chassis_feedback_data.vol=cap->cap_msg.vol;
 }
 /**

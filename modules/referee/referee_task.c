@@ -338,8 +338,8 @@ static void MyUIRefresh(referee_info_t *referee_recv_info, Referee_Interactive_i
         }
         else if(_Interactive_data->chassis_power_data.cap_vol>=16&&_Interactive_data->chassis_power_data.cap_vol<18)
         {
-            UIFloatDraw(&UI_Energy[1], "sd5", UI_Graph_Change, 8, UI_Color_Yellow, 18, 2,2, 750, 230, (float)_Interactive_data->chassis_power_data.cap_vol*1000);
-            UILineDraw(&UI_Energy[2], "sd6", UI_Graph_Change, 8, UI_Color_Yellow, 30, 720, 160, (uint32_t)720 + (_Interactive_data->chassis_power_data.cap_vol-14) * 60, 160);
+            UIFloatDraw(&UI_Energy[1], "sd5", UI_Graph_Change, 8, UI_Color_Black, 18, 2,2, 750, 230, (float)_Interactive_data->chassis_power_data.cap_vol*1000);
+            UILineDraw(&UI_Energy[2], "sd6", UI_Graph_Change, 8, UI_Color_Black, 30, 720, 160, (uint32_t)720 + (_Interactive_data->chassis_power_data.cap_vol-14) * 60, 160);
         }
         else if (_Interactive_data->chassis_power_data.cap_vol>=14&&_Interactive_data->chassis_power_data.cap_vol<16)
         {

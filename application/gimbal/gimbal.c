@@ -78,7 +78,6 @@ void GimbalInit()
     //MIMotorModeSwitch(pitch_motor,1);
     //MIMotorSetPid(pitch_motor,pitch_motor->motor_controller.angle_PID.Kp,4,pitch_motor->motor_controller.speed_PID.Kp,pitch_motor->motor_controller.speed_PID.Ki);
     MIMotorInstanceetMechPositionToZero(pitch_motor);
-
     gimbal_pub = PubRegister("gimbal_feed", sizeof(Gimbal_Upload_Data_s));
     gimbal_sub = SubRegister("gimbal_cmd", sizeof(Gimbal_Ctrl_Cmd_s));
 }
@@ -89,23 +88,19 @@ static void GimbalStateSet()
     {
     // 停止
     case GIMBAL_ZERO_FORCE:
-        MIMotorInstancetop(pitch_motor);
         DJIMotorStop(yaw_motor);
-        motor_init=0;
+        MIMotorEnable(pitch_motor);
         break;
     case GIMBAL_GYRO_MODE: 
         DJIMotorEnable(yaw_motor);
         DJIMotorSetRef(yaw_motor,gimbal_cmd_recv.yaw);
-        MI_motor_LocationControl(pitch_motor,gimbal_cmd_recv.pitch,pitch_motor->motor_controller.angle_PID.Kp,pitch_motor->motor_controller.angle_PID.Kd);
         if(motor_init==0)
         {
-            //MIMotorModeSwitch(pitch_motor,1);
-            MIMotorEnable(pitch_motor);
             gimbal_feedback_data.init_location=gimbal_IMU_data->Pitch;
-
-            //MIMotorSetPid(pitch_motor,pitch_motor->motor_controller.angle_PID.Kp,4,pitch_motor->motor_controller.speed_PID.Kp,pitch_motor->motor_controller.speed_PID.Ki);
             motor_init=1;
         }
+        MI_motor_LocationControl(pitch_motor,gimbal_cmd_recv.pitch,pitch_motor->motor_controller.angle_PID.Kp,pitch_motor->motor_controller.angle_PID.Kd);
+
         /*
         else
         MiMotorSetRef(pitch_motor,gimbal_cmd_recv.pitch);

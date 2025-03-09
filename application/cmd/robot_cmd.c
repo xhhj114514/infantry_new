@@ -51,6 +51,7 @@ static float chassis_speed_buff;
 static referee_info_t* referee_data; // 用于获取裁判系统的数据
 static Referee_Interactive_info_t ui_data; // UI数据，将底盘中的数据传入此结构体的对应变量中，UI会自动检测是否变化，对应显示UI
 static float cnt1,cnt2; 
+static float chassis_speed_buff_1,chassis_rotate_buff_1,chassis_speed_buff_2,chassis_rotate_buff_2;
 
 
 void RobotCMDInit()
@@ -105,7 +106,7 @@ static void CalcOffsetAngle()
 static void GimbalPitchLimit()
 {
     gimbal_cmd_send.gimbal_mode=GIMBAL_GYRO_MODE;
-    // 云台软件限位
+    // //云台软件限位
     if(gimbal_cmd_send.pitch<PITCH_MIN_ANGLE)
     gimbal_cmd_send.pitch=PITCH_MIN_ANGLE;
     else if (gimbal_cmd_send.pitch>PITCH_MAX_ANGLE)
@@ -121,7 +122,7 @@ static void GimbalPitchLimit()
 static void VisionJudge()
 {
 
-        //cnt1用于检测小电脑的离线，取值为[-1,1]
+    //cnt1用于检测小电脑的离线，取值为[-1,1]
 
     //在-0.1到1且小电脑未离线时，读取深度
     cnt1=sin(DWT_GetTimeline_s());
@@ -328,8 +329,8 @@ static void MouseControl()
 
 static void KeyControl()
 {
-    chassis_cmd_send.vx = (rc_data[TEMP].key[KEY_PRESS].w * 10000 - rc_data[TEMP].key[KEY_PRESS].s * 10500)*chassis_cmd_send.chassis_speed_buff; 
-    chassis_cmd_send.vy = (rc_data[TEMP].key[KEY_PRESS].a * 10000 - rc_data[TEMP].key[KEY_PRESS].d * 10500)*chassis_cmd_send.chassis_speed_buff;
+    chassis_cmd_send.vx = (rc_data[TEMP].key[KEY_PRESS].w * 10000 - rc_data[TEMP].key[KEY_PRESS].s * 10000)*chassis_cmd_send.chassis_speed_buff; 
+    chassis_cmd_send.vy = (rc_data[TEMP].key[KEY_PRESS].d * 10000 - rc_data[TEMP].key[KEY_PRESS].a * 10000)*chassis_cmd_send.chassis_speed_buff;
 
     if(chassis_fetch_data.vol>16&&chassis_fetch_data.vol<23)
     {
@@ -343,48 +344,48 @@ static void KeyControl()
     switch (referee_data->GameRobotState.robot_level)
     {
     case 1:
-        chassis_rotate_buff = 1;
-        chassis_speed_buff  = 1;
+        chassis_rotate_buff_1 = 1;
+        chassis_speed_buff_1  = 1;
         break;
     case 2:         
-        chassis_rotate_buff = 1.09;
-        chassis_speed_buff  = 1.09;
+        chassis_rotate_buff_1 = 1.09;
+        chassis_speed_buff_1  = 1.09;
         break;
     case 3:
-        chassis_rotate_buff = 1.16;
-        chassis_speed_buff  = 1.16;
+        chassis_rotate_buff_1 = 1.16;
+        chassis_speed_buff_1  = 1.16;
         break;
     case 4:
-        chassis_rotate_buff = 1.21;
-        chassis_speed_buff  = 1.21;
+        chassis_rotate_buff_1 = 1.21;
+        chassis_speed_buff_1  = 1.21;
         break;
     case 5:
-        chassis_rotate_buff = 1.23;
-        chassis_speed_buff  = 1.3;
+        chassis_rotate_buff_1 = 1.23;
+        chassis_speed_buff_1  = 1.3;
         break;
     case 6:
-        chassis_rotate_buff = 1.3;
-        chassis_speed_buff  = 1.4;
+        chassis_rotate_buff_1 = 1.3;
+        chassis_speed_buff_1  = 1.4;
         break;
     case 7:
-        chassis_rotate_buff = 1.38;
-        chassis_speed_buff  = 1.52;
+        chassis_rotate_buff_1 = 1.38;
+        chassis_speed_buff_1  = 1.52;
         break;
     case 8:
-        chassis_rotate_buff = 1.45;
-        chassis_speed_buff  = 1.6;
+        chassis_rotate_buff_1 = 1.45;
+        chassis_speed_buff_1  = 1.6;
         break;
     case 9:
-        chassis_rotate_buff = 1.55;
-        chassis_speed_buff  = 1.72;
+        chassis_rotate_buff_1 = 1.55;
+        chassis_speed_buff_1  = 1.72;
         break;
     case 10:
-        chassis_rotate_buff = 1.7;
-        chassis_speed_buff  = 1.81;
+        chassis_rotate_buff_1 = 1.7;
+        chassis_speed_buff_1  = 1.81;
         break;
     default:
-        chassis_rotate_buff = 1;
-        chassis_speed_buff  = 1;
+        chassis_rotate_buff_1 = 1;
+        chassis_speed_buff_1  = 1;
         break;
     }
 
@@ -412,43 +413,119 @@ static void KeyControl()
         {
             if(chassis_fetch_data.power_flag==1)
             {
-                if(referee_data->GameRobotState.robot_level<=5)
+                //3级以下，对标功率优先3级（血量优先6级），
+                if(referee_data->GameRobotState.robot_level<=3)
                 {
-                    chassis_cmd_send.chassis_speed_buff= 1.55;
-                    chassis_cmd_send.chassis_rotate_buff= 1.4;
+                    chassis_speed_buff_2= 1.5;
+                    if(chassis_fetch_data.vol<=21&&chassis_fetch_data.vol>=16)
+                    {
+                        chassis_rotate_buff_2= 1.16*1.12*(chassis_fetch_data.vol-16)*0.2;
+                    }
+                    else
+                    {
+                        chassis_rotate_buff_2= 1.16*1.13;
+                    }
                 }
-                else if (referee_data->GameRobotState.robot_level>5)
+                //4-6，对标功率优先6级（血量优先8级），
+                else if (referee_data->GameRobotState.robot_level>3&&referee_data->GameRobotState.robot_level<=6)
                 {
-                    chassis_cmd_send.chassis_speed_buff =chassis_speed_buff+0.25;
-                    chassis_cmd_send.chassis_rotate_buff=chassis_rotate_buff+ 0.2;
+                    chassis_speed_buff_2= 1.6;
+                    if(chassis_fetch_data.vol<=21&&chassis_fetch_data.vol>=16)
+                    {
+                        chassis_rotate_buff_2= 1.3*1.25*(chassis_fetch_data.vol-16)*0.2;
+                    }
+                    else
+                    {
+                        chassis_rotate_buff_2= 1.3*1.25;
+                    }
+                }
+                //7-10，对标功率优先10级（血量优先8级），
+                else if (referee_data->GameRobotState.robot_level>6&&referee_data->GameRobotState.robot_level<=10)
+                {
+                    chassis_speed_buff_2= 1.81;
+                    if(chassis_fetch_data.vol<=21&&chassis_fetch_data.vol>=16)
+                    {
+                        chassis_rotate_buff_2= 1.55*1.09*(chassis_fetch_data.vol-16)*0.2;
+                    }
+                    else
+                    {
+                        chassis_rotate_buff_2= 1.55*1.09;
+                    }     
                 }
             }
             else
             {
-                chassis_cmd_send.chassis_speed_buff= chassis_speed_buff+0.2;
+                chassis_speed_buff_2= chassis_speed_buff+0.2;
+                chassis_rotate_buff_2= chassis_rotate_buff;
             }
-        }   
+        } 
         break;
     default:
-        if(chassis_fetch_data.power_flag==1)
-        {
-            if(referee_data->GameRobotState.robot_level<=5)
+            if(chassis_fetch_data.power_flag==1)
             {
-                chassis_cmd_send.chassis_speed_buff= 1.35;
-                chassis_cmd_send.chassis_rotate_buff= 1.4;
+                //3级以下，对标功率优先3级（血量优先6级），
+                if(referee_data->GameRobotState.robot_level<=3)
+                {
+                    chassis_speed_buff_2= 1.33;
+                    if(chassis_fetch_data.vol<=21&&chassis_fetch_data.vol>=16)
+                    {
+                        chassis_rotate_buff_2= 1.16*1.12*(chassis_fetch_data.vol-16)*0.2;
+                    }
+                    else
+                    {
+                        chassis_rotate_buff_2= 1.16*1.13;
+                    }
+                }
+                //4-6，对标功率优先6级（血量优先8级），
+                else if (referee_data->GameRobotState.robot_level>3&&referee_data->GameRobotState.robot_level<=6)
+                {
+                    chassis_speed_buff_2= 1.43;
+                    if(chassis_fetch_data.vol<=21&&chassis_fetch_data.vol>=16)
+                    {
+                        chassis_rotate_buff_2= 1.3*1.25*(chassis_fetch_data.vol-16)*0.2;
+                    }
+                    else
+                    {
+                        chassis_rotate_buff_2= 1.3*1.25;
+                    }
+                }
+                //7-10，对标功率优先10级（血量优先8级），
+                else if (referee_data->GameRobotState.robot_level>6&&referee_data->GameRobotState.robot_level<=10)
+                {
+                    chassis_speed_buff_2= 1.81;
+                    if(chassis_fetch_data.vol<=21&&chassis_fetch_data.vol>=16)
+                    {
+                        chassis_rotate_buff_2= 1.55*1.09*(chassis_fetch_data.vol-16)*0.2;
+                    }
+                    else
+                    {
+                        chassis_rotate_buff_2= 1.55*1.09;
+                    }     
+                }
             }
-            else if (referee_data->GameRobotState.robot_level>5)
+            else
             {
-                chassis_cmd_send.chassis_speed_buff =chassis_speed_buff+0.05;
-                chassis_cmd_send.chassis_rotate_buff=chassis_rotate_buff+ 0.2;
-            }
-        }
-        else
-        {
-            chassis_cmd_send.chassis_rotate_buff= chassis_rotate_buff;
-            chassis_cmd_send.chassis_speed_buff= chassis_speed_buff;
-        }
+                chassis_speed_buff_2= chassis_speed_buff;
+                chassis_rotate_buff_2= chassis_rotate_buff;
+            } 
         break;
+    }
+    if(chassis_speed_buff_1>=chassis_speed_buff_2)
+    {
+        chassis_cmd_send.chassis_speed_buff=chassis_speed_buff_1;
+    }
+    else
+    {
+        chassis_cmd_send.chassis_speed_buff=chassis_speed_buff_2;
+    }
+    
+    if(chassis_rotate_buff_1>=chassis_rotate_buff_2)
+    {
+        chassis_cmd_send.chassis_rotate_buff=chassis_rotate_buff_1;
+    }
+    else
+    {
+        chassis_cmd_send.chassis_rotate_buff=chassis_rotate_buff_2;
     }
 }
 
@@ -520,7 +597,7 @@ static void JudgeEnermy()
         minipc_send_data.Vision.detect_color=COLOR_BLUE;
     }
 }
-/* 机器人核心控制任务,200Hz频率运行(必须高于视觉发送频率) */
+/* 机器人核心控制任务,200Hz频率运行*/
 void RobotCMDTask()
 {
     SubGetMessage(chassis_feed_sub, (void *)&chassis_fetch_data);
