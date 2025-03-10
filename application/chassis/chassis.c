@@ -7,32 +7,22 @@
 #include "bsp_dwt.h"
 #include "arm_math.h"
 
-/* 根据robot_def.h中的macro自动计算的参数 */
-#define HALF_WHEEL_BASE (WHEEL_BASE / 2.0f)     // 半轴距
-#define HALF_TRACK_WIDTH (TRACK_WIDTH / 2.0f)   // 半轮距
-#define PERIMETER_WHEEL (RADIUS_WHEEL * 2 * PI) // 轮子周长
-
 /* 底盘应用包含的模块和信息存储,底盘是单例模式,因此不需要为底盘建立单独的结构体 */
-static Publisher_t *chassis_pub;                    // 用于发布底盘的数据
-static Subscriber_t *chassis_sub;                   // 用于订阅底盘的控制命令
-static Chassis_Ctrl_Cmd_s chassis_cmd_recv;         // 底盘接收到的控制命令
-static Chassis_Upload_Data_s chassis_feedback_data; // 底盘回传的反馈数据
-static float sin_theta, cos_theta;//麦轮解算用
-
-
-
+/* 设为静态避免参数传递的开销 */
+static Publisher_t *chassis_pub;                                    // 用于发布底盘的数据
+static Subscriber_t *chassis_sub;                                   // 用于订阅底盘的控制命令
+static Chassis_Ctrl_Cmd_s chassis_cmd_recv;                         // 底盘接收到的控制命令
+static Chassis_Upload_Data_s chassis_feedback_data;                 // 底盘回传的反馈数据
+static float sin_theta, cos_theta;                                  // 麦轮解算用
 static SuperCapInstance *cap;                                       // 超级电容
-static uint16_t power_data;
-static DJIMotorInstance *motor_lf, *motor_rf, *motor_lb, *motor_rb; // left right forward back
-/* 用于自旋变速策略的时间变量 */
-static float t;
-
-/* 私有函数计算的中介变量,设为静态避免参数传递的开销 */
-static float chassis_vx, chassis_vy;     // 将云台系的速度投影到底盘
-static float vt_lf, vt_rf, vt_lb, vt_rb; // 底盘速度解算后的临时输出,待进行限幅
+static uint16_t power_data;                                         // 发给功率控制板，使功率控制板能稳定在那个功率 
+static DJIMotorInstance *motor_lf, *motor_rf, *motor_lb, *motor_rb; // 轮子电机实例
+static float chassis_vx, chassis_vy;                                // 将云台系的速度投影到底盘
+static float vt_lf, vt_rf, vt_lb, vt_rb;
 
 void ChassisInit()
 {
+/****************************************************MotorInit*****************************************************/
     Motor_Init_Config_s chassis_motor_config = {
         .can_init_config.can_handle = &hcan1,
         .controller_param_init_config = {
@@ -62,21 +52,23 @@ void ChassisInit()
         .motor_type = M3508,
     };
 
-    chassis_motor_config.can_init_config.tx_id = 3;
-    chassis_motor_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_REVERSE;
-    motor_lf = DJIMotorInit(&chassis_motor_config);
+    chassis_motor_config.can_init_config.tx_id = 1;
+    chassis_motor_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_NORMAL;
+    motor_rb = DJIMotorInit(&chassis_motor_config);
 
     chassis_motor_config.can_init_config.tx_id = 2;
     chassis_motor_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_NORMAL;
     motor_rf = DJIMotorInit(&chassis_motor_config);
 
+    chassis_motor_config.can_init_config.tx_id = 3;
+    chassis_motor_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_REVERSE;
+    motor_lf = DJIMotorInit(&chassis_motor_config);
+
     chassis_motor_config.can_init_config.tx_id = 4;
     chassis_motor_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_REVERSE;
     motor_lb = DJIMotorInit(&chassis_motor_config);
 
-    chassis_motor_config.can_init_config.tx_id = 1;
-    chassis_motor_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_NORMAL;
-    motor_rb = DJIMotorInit(&chassis_motor_config);
+/**************************************************SuperCapCommInit**************************************************/
 
 
     SuperCap_Init_Config_s capconfig = {
@@ -89,16 +81,13 @@ void ChassisInit()
             .send_data_len = sizeof(uint16_t),
         };
      cap=SuperCapInit(&capconfig);
-
+/***************************************************PubSubCommInit***************************************************/
     chassis_sub = SubRegister("chassis_cmd", sizeof(Chassis_Ctrl_Cmd_s));
     chassis_pub = PubRegister("chassis_feed", sizeof(Chassis_Upload_Data_s));
 }
 
-#define LF_CENTER ((HALF_TRACK_WIDTH + CENTER_GIMBAL_OFFSET_X + HALF_WHEEL_BASE - CENTER_GIMBAL_OFFSET_Y) * DEGREE_2_RAD)
-#define RF_CENTER ((HALF_TRACK_WIDTH - CENTER_GIMBAL_OFFSET_X + HALF_WHEEL_BASE - CENTER_GIMBAL_OFFSET_Y) * DEGREE_2_RAD)
-#define LB_CENTER ((HALF_TRACK_WIDTH + CENTER_GIMBAL_OFFSET_X + HALF_WHEEL_BASE + CENTER_GIMBAL_OFFSET_Y) * DEGREE_2_RAD)
-#define RB_CENTER ((HALF_TRACK_WIDTH - CENTER_GIMBAL_OFFSET_X + HALF_WHEEL_BASE + CENTER_GIMBAL_OFFSET_Y) * DEGREE_2_RAD)
 
+/***************************************************MoveChassis******************************************************/
 static void ChassisStateSet()
 {
     if (chassis_cmd_recv.chassis_mode == CHASSIS_ZERO_FORCE)
@@ -117,13 +106,6 @@ static void ChassisStateSet()
     }
 }
 
-
-
-static void SendPowerData()
-{
-    power_data=chassis_cmd_recv.power_limit+27;    
-    chassis_feedback_data.vol=cap->cap_msg.vol;
-}
 /**
  * @brief 计算每个底盘电机的输出,正运动学解算
  *        
@@ -152,8 +134,14 @@ static void LimitChassisOutput()
     DJIMotorSetRef(motor_lb, vt_lb);
     DJIMotorSetRef(motor_rb, vt_rb);
 }
+/*************************************************SendToPowerLimitBoard*************************************************/
 
-/* 机器人底盘控制核心任务 */
+static void SendPowerData()
+{
+    power_data=chassis_cmd_recv.power_limit+27;    
+    chassis_feedback_data.vol=cap->cap_msg.vol;
+}
+/*****************************************************ChassisAllTask*****************************************************/
 void ChassisTask()
 {
     SubGetMessage(chassis_sub, &chassis_cmd_recv);

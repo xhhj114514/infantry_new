@@ -30,27 +30,21 @@
 #define RADIUS_WHEEL 60             // 轮子半径
 #define REDUCTION_RATIO_WHEEL 19.0f // 电机减速比,因为编码器量测的是转子的速度而不是输出轴的速度故需进行转换
 
+// 私有宏,自动将编码器转换成角度值
+#define YAW_ALIGN_ANGLE (YAW_CHASSIS_ALIGN_ECD * ECD_ANGLE_COEF_DJI) // 对齐时的角度,0-360
+#define PTICH_HORIZON_ANGLE (PITCH_HORIZON_ECD * ECD_ANGLE_COEF_DJI) // pitch水平时电机的角度,0-360
+
+/* 根据robot_def.h中的macro自动计算的参数 */
+#define HALF_WHEEL_BASE (WHEEL_BASE / 2.0f)     // 半轴距
+#define HALF_TRACK_WIDTH (TRACK_WIDTH / 2.0f)   // 半轮距
+#define PERIMETER_WHEEL (RADIUS_WHEEL * 2 * PI) // 轮子周长
+
 #pragma pack(1) // 压缩结构体,取消字节对齐,下面的数据都可能被传输
 /* -------------------------基本控制模式和数据类型定义-------------------------*/
 /**
  * @brief 这些枚举类型和结构体会作为CMD控制数据和各应用的反馈数据的一部分
  *
  */
-// 机器人状态
-typedef enum
-{
-    ROBOT_STOP = 0,
-    ROBOT_READY,
-} Robot_Status_e;
-
-// 应用状态
-typedef enum
-{
-    APP_OFFLINE = 0,
-    APP_ONLINE,
-    APP_ERROR,
-} App_Status_e;
-
 // 底盘模式设置
 /**
  * @brief 后续考虑修改为云台跟随底盘,而不是让底盘去追云台,云台的惯量比底盘小.
@@ -111,6 +105,7 @@ typedef struct
     float t_shoot;
     float t_pitch;
     float t_cmd_error;
+    float T_Vision; 
     uint8_t aim_flag;
     uint8_t shoot_flag;
     uint8_t cmd_error_flag;

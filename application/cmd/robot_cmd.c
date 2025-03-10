@@ -16,59 +16,67 @@
 #include "bsp_dwt.h"
 #include "bsp_log.h"
 
-// 私有宏,自动将编码器转换成角度值
-#define YAW_ALIGN_ANGLE (YAW_CHASSIS_ALIGN_ECD * ECD_ANGLE_COEF_DJI) // 对齐时的角度,0-360
-#define PTICH_HORIZON_ANGLE (PITCH_HORIZON_ECD * ECD_ANGLE_COEF_DJI) // pitch水平时电机的角度,0-360
-
+//comm->通信，这里指的是和整个模块实例进行通信
 /* cmd应用包含的模块实例指针和交互信息存储*/
-static Publisher_t *chassis_cmd_pub;   // 底盘控制消息发布者
-static Subscriber_t *chassis_feed_sub; // 底盘反馈信息订阅者
+/************************************** HuartUsed **************************************/
+static RC_ctrl_t *rc_data;                              // 遥控器数据,  初始化时返回（串口3）
+static Minipc_Recv_s *minipc_recv_data;                 // 视觉接收数据,初始化时返回（串口1）
+static Minipc_Send_s minipc_send_data;                  // 视觉发送数据            （串口1）
+static referee_info_t* referee_data;                    // 用于获取裁判系统的数据   （串口6）
+static Referee_Interactive_info_t ui_data;              // UI数据                  (串口6)
 
-static Chassis_Ctrl_Cmd_s chassis_cmd_send;      // 发送给底盘应用的信息,包括控制信息和UI绘制相关
-static Chassis_Upload_Data_s chassis_fetch_data; // 从底盘应用接收的反馈信息信息,底盘功率枪口热量与底盘运动状态等
+/**************************************ChassisUsed**************************************/
+static Publisher_t *chassis_cmd_pub;                    // 底盘控制消息发布者
+static Subscriber_t *chassis_feed_sub;                  // 底盘反馈信息订阅者
+static Chassis_Ctrl_Cmd_s chassis_cmd_send;             // 发送给底盘应用的信息
+static Chassis_Upload_Data_s chassis_fetch_data;        // 从底盘应用接收的反馈信息信息
+static float chassis_rotate_buff;                       //在旋转速度上，真正的等级加成
+static float chassis_speed_buff;                        //在平移速度上，真正的等级加成
+static float chassis_speed_buff_1,chassis_rotate_buff_1;//1是无超电时的等级加成
+static float chassis_speed_buff_2,chassis_rotate_buff_2;//2是有超电时的等级加成
 
-static RC_ctrl_t *rc_data;              // 遥控器数据,初始化时返回
-static Minipc_Recv_s *minipc_recv_data; // 视觉接收数据指针,初始化时返回
-static Minipc_Send_s minipc_send_data;  // 视觉发送数据
+/************************************** GimbalUsed **************************************/
+static Publisher_t *gimbal_cmd_pub;                     // 云台控制消息发布者
+static Subscriber_t *gimbal_feed_sub;                   // 云台反馈信息订阅者
+static Gimbal_Ctrl_Cmd_s gimbal_cmd_send;               // 传递给云台的控制信息
+static Gimbal_Upload_Data_s gimbal_fetch_data;          // 从云台获取的反馈信息
+static uint8_t gimbal_location_init=0;                  // 云台电机设置零位使用
 
-static Publisher_t *gimbal_cmd_pub;            // 云台控制消息发布者
-static Subscriber_t *gimbal_feed_sub;          // 云台反馈信息订阅者
-static Gimbal_Ctrl_Cmd_s gimbal_cmd_send;      // 传递给云台的控制信息
-static Gimbal_Upload_Data_s gimbal_fetch_data; // 从云台获取的反馈信息
+/**************************************  ShootUsed  **************************************/
+static Publisher_t *shoot_cmd_pub;                      // 发射控制消息发布者
+static Subscriber_t *shoot_feed_sub;                    // 发射反馈信息订阅者
+static Shoot_Ctrl_Cmd_s shoot_cmd_send;                 // 传递给发射的控制信息
+static Shoot_Upload_Data_s shoot_fetch_data;            // 从发射获取的反馈信息
 
-static Publisher_t *shoot_cmd_pub;           // 发射控制消息发布者
-static Subscriber_t *shoot_feed_sub;         // 发射反馈信息订阅者
-static Shoot_Ctrl_Cmd_s shoot_cmd_send;      // 传递给发射的控制信息
-static Shoot_Upload_Data_s shoot_fetch_data; // 从发射获取的反馈信息
-
-static Robot_Status_e robot_state; // 机器人整体工作状态
-static  BuzzzerInstance *aim_success_buzzer;
-static DataLebel_t DataLebel;
-
-uint8_t gimbal_location_init=0;
-static float chassis_rotate_buff;
-static float chassis_speed_buff;
-static referee_info_t* referee_data; // 用于获取裁判系统的数据
-static Referee_Interactive_info_t ui_data; // UI数据，将底盘中的数据传入此结构体的对应变量中，UI会自动检测是否变化，对应显示UI
-static float cnt1,cnt2; 
-static float chassis_speed_buff_1,chassis_rotate_buff_1,chassis_speed_buff_2,chassis_rotate_buff_2;
+/****************************************  Other  ****************************************/
+static DataLebel_t DataLebel;                           // 用于记录时间或标志位
+static  BuzzzerInstance *aim_success_buzzer;            // 判断是否能击打目标
 
 
+/*********************************************************************************************
+***************************************      Init     **************************************
+*********************************************************************************************/
 void RobotCMDInit()
 {
-    rc_data = RemoteControlInit(&huart3);   // 修改为对应串口,注意如果是自研板dbus协议串口需选用添加了反相器的那个
-    minipc_recv_data = minipcInit(&huart1); // 视觉通信串口
-    referee_data= UITaskInit(&huart6,&ui_data);
+/**************************************  HuartInit  **************************************/
+    rc_data = RemoteControlInit(&huart3);               // 遥控器通信串口
+    minipc_recv_data = minipcInit(&huart1);             // 视觉通信串口
+    referee_data= UITaskInit(&huart6,&ui_data);         // UI通信串口
 
+/**************************************GimbalCommInit**************************************/
     gimbal_cmd_pub = PubRegister("gimbal_cmd", sizeof(Gimbal_Ctrl_Cmd_s));
     gimbal_feed_sub = SubRegister("gimbal_feed", sizeof(Gimbal_Upload_Data_s));
+    gimbal_cmd_send.pitch = 0;
+
+/************************************** ShootCommInit **************************************/
     shoot_cmd_pub = PubRegister("shoot_cmd", sizeof(Shoot_Ctrl_Cmd_s));
     shoot_feed_sub = SubRegister("shoot_feed", sizeof(Shoot_Upload_Data_s));
 
+/**************************************ChassisCommInit**************************************/
     chassis_cmd_pub = PubRegister("chassis_cmd", sizeof(Chassis_Ctrl_Cmd_s));
     chassis_feed_sub = SubRegister("chassis_feed", sizeof(Chassis_Upload_Data_s));
-    gimbal_cmd_send.pitch = 0;
 
+/**************************************   BufferInit  **************************************/
     Buzzer_config_s aim_success_buzzer_config= {
         .alarm_level=ALARM_LEVEL_ABOVE_MEDIUM,
         .octave=OCTAVE_2,
@@ -76,9 +84,14 @@ void RobotCMDInit()
     aim_success_buzzer= BuzzerRegister(&aim_success_buzzer_config);
 }
 
+/************************************************************************************************
+***************************************      Function      **************************************
+*************************************************************************************************/
+
+
+/**************************************  BasicSet   **************************************/
 /**
  * @brief 根据gimbal app传回的当前电机角度计算和零位的误差
- *        单圈绝对角度的范围是0~360,说明文档中有图示
  *
  */
 static void CalcOffsetAngle()
@@ -102,10 +115,14 @@ static void CalcOffsetAngle()
         chassis_cmd_send.offset_angle = angle - YAW_ALIGN_ANGLE + 360.0f;
 #endif
 }
-
+/**
+ * @brief Pitch轴限位，设定云台为正常工作模式
+ *
+ */
 static void GimbalPitchLimit()
 {
     gimbal_cmd_send.gimbal_mode=GIMBAL_GYRO_MODE;
+
     // //云台软件限位
     if(gimbal_cmd_send.pitch<PITCH_MIN_ANGLE)
     gimbal_cmd_send.pitch=PITCH_MIN_ANGLE;
@@ -122,11 +139,10 @@ static void GimbalPitchLimit()
 static void VisionJudge()
 {
 
-    //cnt1用于检测小电脑的离线，取值为[-1,1]
-
+    //T_Vision用于检测小电脑的离线，取值为[-1,1]
     //在-0.1到1且小电脑未离线时，读取深度
-    cnt1=sin(DWT_GetTimeline_s());
-    if(cnt1>-0.1&&cnt1<1&&DataLebel.cmd_error_flag==0)
+    T_Vision=sin(DWT_GetTimeline_s());
+    if(T_Vision>-0.1&&T_Vision<1&&DataLebel.cmd_error_flag==0)
     {
         gimbal_cmd_send.last_deep= minipc_recv_data->Vision.deep;
     }
@@ -154,8 +170,8 @@ static void VisionJudge()
                 DataLebel.fire_flag=1;
             }
         }
-        //在cnt1<-0.2时，此时不读取深度，但如果之前读取到的深度与实际深度一致，证明小电脑离线，停止自瞄
-        if(minipc_recv_data->Vision.deep-gimbal_cmd_send.last_deep==0&&cnt1<-0.2)
+        //在T_Vision<-0.2时，此时不读取深度，但如果之前读取到的深度与实际深度一致，证明小电脑离线，停止自瞄
+        if(minipc_recv_data->Vision.deep-gimbal_cmd_send.last_deep==0&&T_Vision<-0.2)
         {
             DataLebel.cmd_error_flag=1;
             DataLebel.fire_flag=0;
@@ -171,25 +187,26 @@ static void VisionJudge()
         AlarmSetStatus(aim_success_buzzer, ALARM_OFF);    
     }
 }
-static void ChassisRotateSet()
+static void PowerCapJudge()
 {
-    // 根据控制模式设定旋转速度
-    switch (chassis_cmd_send.chassis_mode)
+    if(chassis_fetch_data.vol>16&&chassis_fetch_data.vol<23)
     {
-        //底盘跟随就不调了，懒
-        case CHASSIS_FOLLOW_GIMBAL_YAW: 
-            chassis_cmd_send.wz =-2.0*abs(chassis_cmd_send.offset_angle)*chassis_cmd_send.offset_angle;
-        break;
-        case CHASSIS_ROTATE: // 变速小陀螺
-            chassis_cmd_send.wz = 2600*chassis_cmd_send.chassis_rotate_buff;
-        break;
-        default:
-        break;
+        chassis_fetch_data.power_flag=1;
+    }
+    else
+    {
+        chassis_fetch_data.power_flag=0;
     }
 }
+/**
+ * @brief 基础设定，包括偏角计算、云台限位，超电判断，自瞄判断，以及发射基本模式设定
+ *
+ */
 static void BasicSet()
 {
+    CalcOffsetAngle();
     GimbalPitchLimit();
+    PowerCapJudge();
     VisionJudge();
     ChassisRotateSet();
 
@@ -201,7 +218,11 @@ static void BasicSet()
 }
 
 
-
+/************************************** GimbalSet   **************************************/
+/**
+ * @brief 云台遥控器控制
+ *
+ */
 static void GimbalRC()
 {
     gimbal_cmd_send.yaw -= 0.0005f * (float)rc_data[TEMP].rc.rocker_right_x;//0
@@ -209,6 +230,10 @@ static void GimbalRC()
     gimbal_cmd_send.real_pitch= ((gimbal_fetch_data.gimbal_imu_data.Pitch)-gimbal_fetch_data.init_location)/57.39;
 }
 
+/**
+ * @brief 云台视觉控制
+ *
+ */
 static void GimbalAC()
 {
     gimbal_cmd_send.yaw-=0.007f*minipc_recv_data->Vision.yaw;   //往右获得的yaw是减
@@ -216,6 +241,11 @@ static void GimbalAC()
 }
 
 
+/************************************** ChassisSet   **************************************/
+/**
+ * @brief 底盘遥控器控制
+ *
+ */
 static void ChassisRC()
 {
     chassis_cmd_send.vx = 30.0f * (float)rc_data[TEMP].rc.rocker_left_y; // _水平方向
@@ -230,17 +260,34 @@ static void ChassisRC()
         chassis_cmd_send.chassis_mode=CHASSIS_ROTATE;
 }
 
-static void AutoAimSet()
+/**
+ * @brief 底盘旋转速度设定
+ *
+ */
+static void ChassisRotateSet()
 {
-    if(DataLebel.aim_flag==1)
+    // 根据控制模式设定旋转速度
+    switch (chassis_cmd_send.chassis_mode)
     {
-        GimbalAC();
-        if(DataLebel.fire_flag==1)
-        {
-            shoot_cmd_send.loader_mode = LOAD_BURSTFIRE;
-        }
+        //底盘跟随
+        case CHASSIS_FOLLOW_GIMBAL_YAW: 
+            chassis_cmd_send.wz =-2.0*abs(chassis_cmd_send.offset_angle)*chassis_cmd_send.offset_angle;
+        break;
+        //小陀螺
+        case CHASSIS_ROTATE: 
+            chassis_cmd_send.wz = 2600*chassis_cmd_send.chassis_rotate_buff;
+        break;
+        //未知
+        default:
+        break;
     }
 }
+
+/************************************** ShootSet   **************************************/
+/**
+ * @brief 发射机构遥控器控制
+ *
+ */
 static void ShootRC()
 {
     if(rc_data->rc.dial>200)
@@ -259,13 +306,42 @@ static void ShootRC()
     }
 }
 
+/************************************** AutoAimSet   **************************************/
 /**
- * @brief 控制输入为遥控器(调试时)的模式和控制量设置
+ * @brief 自动瞄准设置
+ * 
+ * 本函数根据当前的数据标志来控制云台的动作和射击模式
+ * 它首先检查是否处于瞄准状态，如果是，则调用云台控制函数
+ * 进一步检查是否需要开火，如果是，则设置射击模式为连发
  *
+ */
+static void AutoAimSet()
+{
+    if(DataLebel.aim_flag==1)
+    {
+        GimbalAC();
+        if(DataLebel.fire_flag==1)
+        {
+            shoot_cmd_send.loader_mode = LOAD_BURSTFIRE;
+        }
+    }
+}
+
+
+
+
+
+/**************************************RemoteControlSet**************************************/
+/**
+ * @brief  RemoteControlSet函数用于根据遥控器输入控制机器人，包括底盘、云台和射击系统的控制。
+ * 该函数首先调用ChassisRC控制底盘运动，然后根据遥控器左侧开关的状态决定是否启用自动瞄准模式。
+ * 在自动瞄准模式下，会调用AutoAimSet进行自动瞄准设置，并根据是否已瞄准目标来决定是否继续遥控云台和射击系统。
+ * 如果不启用自动瞄准模式，则直接遥控云台和射击系统。
  */
 static void RemoteControlSet()
 {
     ChassisRC();
+
     if(switch_is_up(rc_data[TEMP].rc.switch_left)) 
     {
         gimbal_cmd_send.autoaim_mode=AUTO_ON;
@@ -282,6 +358,11 @@ static void RemoteControlSet()
         ShootRC();
     }
 }
+
+/**************************************ComputerControlSet**************************************/
+/**
+ * @brief 纯手瞄
+ */
 static void NoneAutoMouseControl()
 {
     gimbal_cmd_send.yaw -= (float)rc_data[TEMP].mouse.x / 660 *3 ; 
@@ -302,6 +383,13 @@ static void NoneAutoMouseControl()
         shoot_cmd_send.loader_mode = LOAD_STOP;
     }            
 }
+/**
+ * @brief 鼠标控制函数
+ * 如果鼠标右键被按下，自动瞄准模式将开启，否则将关闭
+ * 在自动瞄准模式下，将调用AutoAimSet函数进行自动瞄准设置
+ * 如果自动瞄准设置未成功（aim_flag不为1），则调用NoneAutoMouseControl函数进行非自动模式下的鼠标控制
+ * 在非自动瞄准模式下，,如果找不到目标也将用手瞄
+ */
 static void MouseControl()
 {
     if(rc_data[TEMP].mouse.press_r==1)
@@ -326,21 +414,26 @@ static void MouseControl()
         NoneAutoMouseControl();
     }
 }
-
+/**
+ * @brief 键盘控制函数
+ */
 static void KeyControl()
 {
+    //根据R键控制底盘模式
+    switch (rc_data[TEMP].key_count[KEY_PRESS][Key_R] % 2) 
+    {
+    case 0:
+        chassis_cmd_send.chassis_mode =CHASSIS_FOLLOW_GIMBAL_YAW;
+        break;
+    default:
+        chassis_cmd_send.chassis_mode =CHASSIS_ROTATE;
+    }
+
+    // 根据W/S键设置纵向速度，根据A/D键设置横向速度
     chassis_cmd_send.vx = (rc_data[TEMP].key[KEY_PRESS].w * 10000 - rc_data[TEMP].key[KEY_PRESS].s * 10000)*chassis_cmd_send.chassis_speed_buff; 
     chassis_cmd_send.vy = (rc_data[TEMP].key[KEY_PRESS].d * 10000 - rc_data[TEMP].key[KEY_PRESS].a * 10000)*chassis_cmd_send.chassis_speed_buff;
 
-    if(chassis_fetch_data.vol>16&&chassis_fetch_data.vol<23)
-    {
-        chassis_fetch_data.power_flag=1;
-    }
-    else
-    {
-        chassis_fetch_data.power_flag=0;
-    }
-
+    // 根据机器人等级设置速度和旋转缓冲系数(无超电使用)
     switch (referee_data->GameRobotState.robot_level)
     {
     case 1:
@@ -388,24 +481,7 @@ static void KeyControl()
         chassis_speed_buff_1  = 1;
         break;
     }
-
-    switch (rc_data[TEMP].key_count[KEY_PRESS][Key_R] % 2) 
-    {
-    case 0:
-        chassis_cmd_send.chassis_mode =CHASSIS_FOLLOW_GIMBAL_YAW;
-        break;
-    default:
-        chassis_cmd_send.chassis_mode =CHASSIS_ROTATE;
-    }
-
-    if(rc_data[TEMP].key[KEY_PRESS].q)
-    {
-        DataLebel.reverse_flag=1;
-    }
-    else
-    {
-        DataLebel.reverse_flag=0;
-    }
+// 根据Shift键和功率标志进一步调整速度和旋转缓冲系数
 
     switch (rc_data[TEMP].key[KEY_PRESS].shift)
     {
@@ -510,29 +586,27 @@ static void KeyControl()
             } 
         break;
     }
-    if(chassis_speed_buff_1>=chassis_speed_buff_2)
+    //选择最快的那个速度
+    chassis_cmd_send.chassis_speed_buff = (chassis_speed_buff_1 >= chassis_speed_buff_2) ? chassis_speed_buff_1 : chassis_speed_buff_2;
+
+    // 选择最快的旋转速度
+    chassis_cmd_send.chassis_rotate_buff = (chassis_rotate_buff_1 >= chassis_rotate_buff_2) ? chassis_rotate_buff_1 : chassis_rotate_buff_2;
+
+    //根据Q键设置拨盘模式
+    if(rc_data[TEMP].key[KEY_PRESS].q)
     {
-        chassis_cmd_send.chassis_speed_buff=chassis_speed_buff_1;
+        DataLebel.reverse_flag=1;
     }
     else
     {
-        chassis_cmd_send.chassis_speed_buff=chassis_speed_buff_2;
-    }
-    
-    if(chassis_rotate_buff_1>=chassis_rotate_buff_2)
-    {
-        chassis_cmd_send.chassis_rotate_buff=chassis_rotate_buff_1;
-    }
-    else
-    {
-        chassis_cmd_send.chassis_rotate_buff=chassis_rotate_buff_2;
+        DataLebel.reverse_flag=0;
     }
 }
 
 
 
 /**
- * @brief 输入为键鼠时模式和控制量设置
+ * @brief 用电脑操作
  *
  */
 static void MouseKeySet()
@@ -540,6 +614,7 @@ static void MouseKeySet()
     MouseControl();
     KeyControl();
 }
+/**************************************   STOP   **************************************/
 
 /**
  * @brief 停止
@@ -556,7 +631,8 @@ static void AnythingStop()
 }
 
 /**
- * @brief 控制量及模式设置
+ * @brief 根据遥控器开关的不同位置，执行不同的函数
+ * 它通过检查遥控器数据右开关的上、中、下位置来决定接下来的操作
  *
  */
 static void ControlDataDeal()
@@ -577,6 +653,7 @@ static void ControlDataDeal()
     }
 }
 
+/**************************************   SendData   **************************************/
 static void SendToUIData()
 {
     ui_data.autoaim_mode=gimbal_cmd_send.autoaim_mode;
@@ -597,19 +674,21 @@ static void JudgeEnermy()
         minipc_send_data.Vision.detect_color=COLOR_BLUE;
     }
 }
-/* 机器人核心控制任务,200Hz频率运行*/
+
+/************************************************************************************************
+***************************************      TASK      ******************************************
+*************************************************************************************************/
 void RobotCMDTask()
 {
+/**************************************  GetFetchData  **************************************/
     SubGetMessage(chassis_feed_sub, (void *)&chassis_fetch_data);
     SubGetMessage(shoot_feed_sub, &shoot_fetch_data);
     SubGetMessage(gimbal_feed_sub, &gimbal_fetch_data);
 
-    // 根据gimbal的反馈值计算云台和底盘正方向的夹角,不需要传参,通过static私有变量完成
-    CalcOffsetAngle();
+/*************************************     Control     **************************************/
     ControlDataDeal();
-
-    // 设置视觉发送数据,还需增加加速度和角速度数据
-    // 推送消息,双板通信,视觉通信等
+ 
+/**************************************    SendData    **************************************/
     PubPushMessage(chassis_cmd_pub, (void *)&chassis_cmd_send);
     PubPushMessage(shoot_cmd_pub, (void *)&shoot_cmd_send);
     PubPushMessage(gimbal_cmd_pub, (void *)&gimbal_cmd_send);
