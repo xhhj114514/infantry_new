@@ -30,8 +30,6 @@ static Publisher_t *chassis_cmd_pub;                    // 底盘控制消息发
 static Subscriber_t *chassis_feed_sub;                  // 底盘反馈信息订阅者
 static Chassis_Ctrl_Cmd_s chassis_cmd_send;             // 发送给底盘应用的信息
 static Chassis_Upload_Data_s chassis_fetch_data;        // 从底盘应用接收的反馈信息信息
-static float chassis_rotate_buff;                       //在旋转速度上，真正的等级加成
-static float chassis_speed_buff;                        //在平移速度上，真正的等级加成
 static float chassis_speed_buff_1,chassis_rotate_buff_1;//1是无超电时的等级加成
 static float chassis_speed_buff_2,chassis_rotate_buff_2;//2是有超电时的等级加成
 
@@ -53,8 +51,8 @@ static DataLebel_t DataLebel;                           // 用于记录时间或
 static  BuzzzerInstance *aim_success_buzzer;            // 判断是否能击打目标
 
 
-/*********************************************************************************************
-***************************************      Init     **************************************
+/********************************************************************************************
+***************************************      Init     ***************************************
 *********************************************************************************************/
 void RobotCMDInit()
 {
@@ -84,12 +82,12 @@ void RobotCMDInit()
     aim_success_buzzer= BuzzerRegister(&aim_success_buzzer_config);
 }
 
-/************************************************************************************************
-***************************************      Function      **************************************
-*************************************************************************************************/
 
+/*********************************************************************************************
+***************************************      Function      ***********************************
+**********************************************************************************************/
 
-/**************************************  BasicSet   **************************************/
+/**************************************      BasicSet      *************************************/
 /**
  * @brief 根据gimbal app传回的当前电机角度计算和零位的误差
  *
@@ -115,6 +113,7 @@ static void CalcOffsetAngle()
         chassis_cmd_send.offset_angle = angle - YAW_ALIGN_ANGLE + 360.0f;
 #endif
 }
+
 /**
  * @brief Pitch轴限位，设定云台为正常工作模式
  *
@@ -139,15 +138,15 @@ static void GimbalPitchLimit()
 static void VisionJudge()
 {
 
-    //T_Vision用于检测小电脑的离线，取值为[-1,1]
+    //DataLebel.T_Vision用于检测小电脑的离线，取值为[-1,1]
     //在-0.1到1且小电脑未离线时，读取深度
-    T_Vision=sin(DWT_GetTimeline_s());
-    if(T_Vision>-0.1&&T_Vision<1&&DataLebel.cmd_error_flag==0)
+    DataLebel.T_Vision=sin(DWT_GetTimeline_s());
+    if(DataLebel.T_Vision>-0.1&&DataLebel.T_Vision<1&&DataLebel.cmd_error_flag==0)
     {
         gimbal_cmd_send.last_deep= minipc_recv_data->Vision.deep;
     }
     //有深度代表有视觉信息
-    if(minipc_recv_data->Vision.deep!=0&&DataLebel.cmd_error_flag==0)//代表收到信息
+    if(minipc_recv_data->Vision.deep!=0&&DataLebel.cmd_error_flag==0)
     {
         DataLebel.aim_flag=1;
         //检测到装甲板，开启蜂鸣器
@@ -170,8 +169,8 @@ static void VisionJudge()
                 DataLebel.fire_flag=1;
             }
         }
-        //在T_Vision<-0.2时，此时不读取深度，但如果之前读取到的深度与实际深度一致，证明小电脑离线，停止自瞄
-        if(minipc_recv_data->Vision.deep-gimbal_cmd_send.last_deep==0&&T_Vision<-0.2)
+        //在DataLebel.T_Vision<-0.2时，此时不读取深度，但如果之前读取到的深度与实际深度一致，证明小电脑离线，停止自瞄
+        if(minipc_recv_data->Vision.deep-gimbal_cmd_send.last_deep==0&&DataLebel.T_Vision<-0.2)
         {
             DataLebel.cmd_error_flag=1;
             DataLebel.fire_flag=0;
@@ -187,6 +186,10 @@ static void VisionJudge()
         AlarmSetStatus(aim_success_buzzer, ALARM_OFF);    
     }
 }
+
+/**
+ * @brief 判断有无超电
+ */
 static void PowerCapJudge()
 {
     if(chassis_fetch_data.vol>16&&chassis_fetch_data.vol<23)
@@ -197,67 +200,6 @@ static void PowerCapJudge()
     {
         chassis_fetch_data.power_flag=0;
     }
-}
-/**
- * @brief 基础设定，包括偏角计算、云台限位，超电判断，自瞄判断，以及发射基本模式设定
- *
- */
-static void BasicSet()
-{
-    CalcOffsetAngle();
-    GimbalPitchLimit();
-    PowerCapJudge();
-    VisionJudge();
-    ChassisRotateSet();
-
-    //发射基本模式设定
-    shoot_cmd_send.shoot_mode = SHOOT_ON;
-    shoot_cmd_send.friction_mode = FRICTION_ON;
-    shoot_cmd_send.shoot_rate=8;
-    chassis_cmd_send.power_limit=referee_data->GameRobotState.chassis_power_limit;
-}
-
-
-/************************************** GimbalSet   **************************************/
-/**
- * @brief 云台遥控器控制
- *
- */
-static void GimbalRC()
-{
-    gimbal_cmd_send.yaw -= 0.0005f * (float)rc_data[TEMP].rc.rocker_right_x;//0
-    gimbal_cmd_send.pitch -= 0.0001f * (float)rc_data[TEMP].rc.rocker_right_y;
-    gimbal_cmd_send.real_pitch= ((gimbal_fetch_data.gimbal_imu_data.Pitch)-gimbal_fetch_data.init_location)/57.39;
-}
-
-/**
- * @brief 云台视觉控制
- *
- */
-static void GimbalAC()
-{
-    gimbal_cmd_send.yaw-=0.007f*minipc_recv_data->Vision.yaw;   //往右获得的yaw是减
-    gimbal_cmd_send.pitch -= 0.009f*minipc_recv_data->Vision.pitch;
-}
-
-
-/************************************** ChassisSet   **************************************/
-/**
- * @brief 底盘遥控器控制
- *
- */
-static void ChassisRC()
-{
-    chassis_cmd_send.vx = 30.0f * (float)rc_data[TEMP].rc.rocker_left_y; // _水平方向
-    chassis_cmd_send.vy =-30.0f * (float)rc_data[TEMP].rc.rocker_left_x; // 竖直方向
-    chassis_cmd_send.chassis_rotate_buff=1;
-    chassis_cmd_send.chassis_speed_buff=1;
-    if (switch_is_down(rc_data[TEMP].rc.switch_left))
-    {
-        chassis_cmd_send.chassis_mode=CHASSIS_FOLLOW_GIMBAL_YAW;
-    }
-    else
-        chassis_cmd_send.chassis_mode=CHASSIS_ROTATE;
 }
 
 /**
@@ -281,6 +223,66 @@ static void ChassisRotateSet()
         default:
         break;
     }
+}
+
+/**
+ * @brief 基础设定，包括偏角计算、云台限位，超电判断，自瞄判断，以及发射基本模式设定
+ *
+ */
+static void BasicSet()
+{
+    CalcOffsetAngle();
+    GimbalPitchLimit();
+    PowerCapJudge();
+    VisionJudge();
+    ChassisRotateSet();
+
+    //发射基本模式设定
+    shoot_cmd_send.shoot_mode = SHOOT_ON;
+    shoot_cmd_send.friction_mode = FRICTION_ON;
+    shoot_cmd_send.shoot_rate=8;
+    chassis_cmd_send.power_limit=referee_data->GameRobotState.chassis_power_limit;
+}
+
+/************************************** GimbalSet   **************************************/
+/**
+ * @brief 云台遥控器控制
+ *
+ */
+static void GimbalRC()
+{
+    gimbal_cmd_send.yaw -= 0.0005f * (float)rc_data[TEMP].rc.rocker_right_x;//0
+    gimbal_cmd_send.pitch -= 0.0001f * (float)rc_data[TEMP].rc.rocker_right_y;
+    gimbal_cmd_send.real_pitch= ((gimbal_fetch_data.gimbal_imu_data.Pitch)-gimbal_fetch_data.init_location)/57.39;
+}
+
+/**
+ * @brief 云台视觉控制
+ *
+ */
+static void GimbalAC()
+{
+    gimbal_cmd_send.yaw-=0.007f*minipc_recv_data->Vision.yaw;   //往右获得的yaw是减
+    gimbal_cmd_send.pitch -= 0.009f*minipc_recv_data->Vision.pitch;
+}
+
+/************************************** ChassisSet   **************************************/
+/**
+ * @brief 底盘遥控器控制
+ *
+ */
+static void ChassisRC()
+{
+    chassis_cmd_send.vx = 30.0f * (float)rc_data[TEMP].rc.rocker_left_y; // _水平方向
+    chassis_cmd_send.vy =-30.0f * (float)rc_data[TEMP].rc.rocker_left_x; // 竖直方向
+    chassis_cmd_send.chassis_rotate_buff=1;
+    chassis_cmd_send.chassis_speed_buff=1;
+    if (switch_is_down(rc_data[TEMP].rc.switch_left))
+    {
+        chassis_cmd_send.chassis_mode=CHASSIS_FOLLOW_GIMBAL_YAW;
+    }
+    else
+        chassis_cmd_send.chassis_mode=CHASSIS_ROTATE;
 }
 
 /************************************** ShootSet   **************************************/
@@ -326,10 +328,6 @@ static void AutoAimSet()
         }
     }
 }
-
-
-
-
 
 /**************************************RemoteControlSet**************************************/
 /**
@@ -383,6 +381,7 @@ static void NoneAutoMouseControl()
         shoot_cmd_send.loader_mode = LOAD_STOP;
     }            
 }
+
 /**
  * @brief 鼠标控制函数
  * 如果鼠标右键被按下，自动瞄准模式将开启，否则将关闭
@@ -414,6 +413,7 @@ static void MouseControl()
         NoneAutoMouseControl();
     }
 }
+
 /**
  * @brief 键盘控制函数
  */
@@ -531,8 +531,8 @@ static void KeyControl()
             }
             else
             {
-                chassis_speed_buff_2= chassis_speed_buff+0.2;
-                chassis_rotate_buff_2= chassis_rotate_buff;
+                chassis_speed_buff_2= chassis_speed_buff_1+0.2;
+                chassis_rotate_buff_2= chassis_speed_buff_1;
             }
         } 
         break;
@@ -581,8 +581,8 @@ static void KeyControl()
             }
             else
             {
-                chassis_speed_buff_2= chassis_speed_buff;
-                chassis_rotate_buff_2= chassis_rotate_buff;
+                chassis_speed_buff_2= chassis_speed_buff_1;
+                chassis_rotate_buff_2= chassis_rotate_buff_1;
             } 
         break;
     }
@@ -603,8 +603,6 @@ static void KeyControl()
     }
 }
 
-
-
 /**
  * @brief 用电脑操作
  *
@@ -615,7 +613,6 @@ static void MouseKeySet()
     KeyControl();
 }
 /**************************************   STOP   **************************************/
-
 /**
  * @brief 停止
  */
@@ -675,9 +672,9 @@ static void JudgeEnermy()
     }
 }
 
-/************************************************************************************************
-***************************************      TASK      ******************************************
-*************************************************************************************************/
+/*********************************************************************************************
+***************************************      TASK      ***************************************
+**********************************************************************************************/
 void RobotCMDTask()
 {
 /**************************************  GetFetchData  **************************************/

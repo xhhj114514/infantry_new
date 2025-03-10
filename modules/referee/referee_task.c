@@ -155,7 +155,6 @@ static void RobotModeTest(Referee_Interactive_info_t *_Interactive_data) // æµ‹è
         _Interactive_data->chassis_mode = CHASSIS_ROTATE;
         _Interactive_data->gimbal_mode = GIMBAL_GYRO_MODE;
         _Interactive_data->shoot_mode = SHOOT_OFF;
-        _Interactive_data->loader_mode = LOAD_1_BULLET;
         _Interactive_data->autoaim_mode = AUTO_ON;
 
         break;
@@ -266,12 +265,6 @@ static void MyUIRefresh(referee_info_t *referee_recv_info, Referee_Interactive_i
     {
         switch (_Interactive_data->loader_mode)
         {
-            case LOAD_1_BULLET:
-            {
-                UICharDraw(&UI_State_dyn[3], "sd3", UI_Graph_Change, 8, UI_Color_Green, 15, 2, 270, 600, "normal   ");
-                UICircleDraw(&UI_State_Cir[3],"sa3",UI_Graph_Change,9,UI_Color_Green,5,130,595,10);
-                break;
-            }
             case LOAD_BURSTFIRE:
             {
                 UICharDraw(&UI_State_dyn[3], "sd3", UI_Graph_Change, 8, UI_Color_Purplish_red, 15, 2, 270, 600, "angry    ");

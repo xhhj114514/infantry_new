@@ -1,28 +1,41 @@
+//app
 #include "chassis.h"
 #include "robot_def.h"
+
+//module
 #include "dji_motor.h"
 #include "super_cap.h"
 #include "message_center.h"
 #include "general_def.h"
+
+//bsp
 #include "bsp_dwt.h"
 #include "arm_math.h"
 
 /* 底盘应用包含的模块和信息存储,底盘是单例模式,因此不需要为底盘建立单独的结构体 */
 /* 设为静态避免参数传递的开销 */
+/************************************** CommUsed **************************************/
 static Publisher_t *chassis_pub;                                    // 用于发布底盘的数据
 static Subscriber_t *chassis_sub;                                   // 用于订阅底盘的控制命令
 static Chassis_Ctrl_Cmd_s chassis_cmd_recv;                         // 底盘接收到的控制命令
 static Chassis_Upload_Data_s chassis_feedback_data;                 // 底盘回传的反馈数据
+
+/*********************************** CalculateSpeed ***********************************/
 static float sin_theta, cos_theta;                                  // 麦轮解算用
+static float chassis_vx, chassis_vy;                                // 将云台系的速度投影到底盘
+static float vt_lf, vt_rf, vt_lb, vt_rb;                            // 四轮速度
+static DJIMotorInstance *motor_lf, *motor_rf, *motor_lb, *motor_rb; // 四轮电机实例
+
+/************************************ SuperCapUsed ************************************/
 static SuperCapInstance *cap;                                       // 超级电容
 static uint16_t power_data;                                         // 发给功率控制板，使功率控制板能稳定在那个功率 
-static DJIMotorInstance *motor_lf, *motor_rf, *motor_lb, *motor_rb; // 轮子电机实例
-static float chassis_vx, chassis_vy;                                // 将云台系的速度投影到底盘
-static float vt_lf, vt_rf, vt_lb, vt_rb;
 
+/********************************************************************************************
+***************************************      Init     ***************************************
+*********************************************************************************************/
 void ChassisInit()
 {
-/****************************************************MotorInit*****************************************************/
+/***************************************** MotorInit *****************************************/
     Motor_Init_Config_s chassis_motor_config = {
         .can_init_config.can_handle = &hcan1,
         .controller_param_init_config = {
@@ -68,7 +81,7 @@ void ChassisInit()
     chassis_motor_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_REVERSE;
     motor_lb = DJIMotorInit(&chassis_motor_config);
 
-/**************************************************SuperCapCommInit**************************************************/
+/****************************************SuperCapCommInit****************************************/
 
 
     SuperCap_Init_Config_s capconfig = {
@@ -81,13 +94,17 @@ void ChassisInit()
             .send_data_len = sizeof(uint16_t),
         };
      cap=SuperCapInit(&capconfig);
-/***************************************************PubSubCommInit***************************************************/
+/*****************************************PubSubCommInit*****************************************/
     chassis_sub = SubRegister("chassis_cmd", sizeof(Chassis_Ctrl_Cmd_s));
     chassis_pub = PubRegister("chassis_feed", sizeof(Chassis_Upload_Data_s));
 }
 
 
-/***************************************************MoveChassis******************************************************/
+/************************************************************************************************
+***************************************      Function      **************************************
+*************************************************************************************************/
+
+/**************************************** MoveChassis *******************************************/
 static void ChassisStateSet()
 {
     if (chassis_cmd_recv.chassis_mode == CHASSIS_ZERO_FORCE)
@@ -118,42 +135,47 @@ static void MecanumCalculate()
     chassis_vx = chassis_cmd_recv.vx * cos_theta - chassis_cmd_recv.vy * sin_theta; 
     chassis_vy = chassis_cmd_recv.vx * sin_theta + chassis_cmd_recv.vy * cos_theta;
 
-    vt_lf = chassis_vx - chassis_vy - chassis_cmd_recv.wz * LF_CENTER;
-    vt_lb = chassis_vx + chassis_vy - chassis_cmd_recv.wz * LB_CENTER;
-    vt_rb = chassis_vx - chassis_vy + chassis_cmd_recv.wz * RB_CENTER;
-    vt_rf = chassis_vx + chassis_vy + chassis_cmd_recv.wz * RF_CENTER;
+    vt_lf = chassis_vx - chassis_vy - chassis_cmd_recv.wz ;
+    vt_lb = chassis_vx + chassis_vy - chassis_cmd_recv.wz ;
+    vt_rb = chassis_vx - chassis_vy + chassis_cmd_recv.wz ;
+    vt_rf = chassis_vx + chassis_vy + chassis_cmd_recv.wz ;
 }
+
 /**
  * @brief 根据裁判系统和电容剩余容量对输出进行限制并设置电机参考值
  *
  */
-static void LimitChassisOutput()
+static void ChassisOutput()
 {
     DJIMotorSetRef(motor_lf, vt_lf);
     DJIMotorSetRef(motor_rf, vt_rf);
     DJIMotorSetRef(motor_lb, vt_lb);
     DJIMotorSetRef(motor_rb, vt_rb);
 }
-/*************************************************SendToPowerLimitBoard*************************************************/
 
+/*****************************************SendToPowerLimitBoard*****************************************/
 static void SendPowerData()
 {
     power_data=chassis_cmd_recv.power_limit+27;    
     chassis_feedback_data.vol=cap->cap_msg.vol;
 }
-/*****************************************************ChassisAllTask*****************************************************/
+
+
+/*********************************************************************************************************
+ *********************************************      TASK     *********************************************
+**********************************************************************************************************/
 void ChassisTask()
 {
+/********************************************   GetRecvData  *********************************************/
     SubGetMessage(chassis_sub, &chassis_cmd_recv);
+/****************************************     ControlChassis     *****************************************/
     ChassisStateSet();
-    // 根据控制模式进行正运动学解算,计算底盘输出
     MecanumCalculate();
+    ChassisOutput();
 
-    // 根据裁判系统的反馈数据和电容数据对输出限幅并设定闭环参考值
-    LimitChassisOutput();
+/*******************************************     SendData     ********************************************/
     // 推送反馈消息
     PubPushMessage(chassis_pub, (void *)&chassis_feedback_data);
     SendPowerData();
-
     SuperCapSend(cap, (uint8_t*)&power_data);
 }

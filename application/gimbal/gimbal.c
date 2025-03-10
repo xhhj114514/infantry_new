@@ -1,5 +1,8 @@
+//bsp
 #include "gimbal.h"
 #include "robot_def.h"
+
+//module
 #include "dji_motor.h"
 #include "ins_task.h"
 #include "message_center.h"
@@ -7,18 +10,28 @@
 #include "mi_motor.h"
 #include "bmi088.h"
 
+/************************************* GimbalUsed *************************************/
 static attitude_t *gimbal_IMU_data; // 云台IMU数据
 static DJIMotorInstance *yaw_motor;
 static MIMotorInstance *pitch_motor;
+static uint8_t motor_init=0;
 
+/************************************** CommUsed **************************************/
 static Publisher_t *gimbal_pub;                   // 云台应用消息发布者(云台反馈给cmd)
 static Subscriber_t *gimbal_sub;                  // cmd控制消息订阅者
 static Gimbal_Upload_Data_s gimbal_feedback_data; // 回传给cmd的云台状态信息
 static Gimbal_Ctrl_Cmd_s gimbal_cmd_recv;         // 来自cmd的控制信息
-static uint8_t motor_init=0;
+
+
+/****************************************************************************************
+***************************************      Init     ***********************************
+*****************************************************************************************/
 void GimbalInit()
 {
+/****************************************  IMUInit  **************************************/
     gimbal_IMU_data = INS_Init(); // IMU先初始化,获取姿态数据指针赋给yaw电机的其他数据来源
+
+/**************************************** MotorInit **************************************/
     // YAW
     Motor_Init_Config_s yaw_config = {
         .can_init_config = {
@@ -78,10 +91,18 @@ void GimbalInit()
     //MIMotorModeSwitch(pitch_motor,1);
     //MIMotorSetPid(pitch_motor,pitch_motor->motor_controller.angle_PID.Kp,4,pitch_motor->motor_controller.speed_PID.Kp,pitch_motor->motor_controller.speed_PID.Ki);
     MIMotorInstanceetMechPositionToZero(pitch_motor);
+
+/*****************************************PubSubCommInit*****************************************/
     gimbal_pub = PubRegister("gimbal_feed", sizeof(Gimbal_Upload_Data_s));
     gimbal_sub = SubRegister("gimbal_cmd", sizeof(Gimbal_Ctrl_Cmd_s));
 }
 
+
+/************************************************************************************************
+***************************************      Function      **************************************
+*************************************************************************************************/
+
+/***************************************** MoveGimbal ********************************************/
 static void GimbalStateSet()
 {
     switch (gimbal_cmd_recv.gimbal_mode)
@@ -111,29 +132,29 @@ static void GimbalStateSet()
     }
 }
 
-static void JudgeCmdError()
-{
-
-
-}
-
-static void SendGimbalData()
+/*****************************************FeedbackData*****************************************/
+ static void SendGimbalData()
 {
     gimbal_feedback_data.gimbal_imu_data = *gimbal_IMU_data;
     gimbal_feedback_data.yaw_motor_single_round_angle = yaw_motor->measure.angle_single_round;
 }
 
+/************************************************************************************************
+***************************************        TASK        **************************************
+*************************************************************************************************/
 /* 机器人云台控制核心任务 */
 void GimbalTask()
 {
+/**************************************  GetRecvData  **************************************/
     // 获取云台控制数据
     SubGetMessage(gimbal_sub, &gimbal_cmd_recv);
+/**********************************     ControlGimbal     ***********************************/
+
     //云台启停
     GimbalStateSet();
+/**************************************    SendData    **************************************/
     // 设置反馈数据,主要是imu和yaw的ecd
-    SendGimbalData();
-    //模块离线检测
-    //JudgeCmdError();    
+    SendGimbalData();    
     // 推送消息
     PubPushMessage(gimbal_pub, (void *)&gimbal_feedback_data);
 }

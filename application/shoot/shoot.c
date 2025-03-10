@@ -1,26 +1,32 @@
+//app
 #include "shoot.h"
 #include "robot_def.h"
 
+//module
 #include "dji_motor.h"
 #include "message_center.h"
-#include "bsp_dwt.h"
 #include "general_def.h"
 
+//bsp
+#include "bsp_dwt.h"
+
+/************************************* ShootUsed *************************************/
 /* 对于双发射机构的机器人,将下面的数据封装成结构体即可,生成两份shoot应用实例 */
 static DJIMotorInstance *friction_l, *friction_r, *loader; // 拨盘电机
-// static servo_instance *lid; 需要增加弹舱盖
 
+/************************************** CommUsed **************************************/
 static Publisher_t *shoot_pub;
 static Shoot_Ctrl_Cmd_s shoot_cmd_recv; // 来自cmd的发射控制信息
 static Subscriber_t *shoot_sub;
 static Shoot_Upload_Data_s shoot_feedback_data; // 来自cmd的发射控制信息
 
-// dwt定时,计算冷却用
-static float hibernate_time = 0, dead_time = 0;
-
-
+/****************************************************************************************
+***************************************      Init     ***********************************
+*****************************************************************************************/
 void ShootInit()
 {
+
+/**************************************** MotorInit **************************************/
     // 左摩擦轮
     Motor_Init_Config_s friction_config = {
         .can_init_config = 
@@ -95,10 +101,17 @@ void ShootInit()
     loader_config.can_init_config.tx_id=3;
     loader = DJIMotorInit(&loader_config);
 
+/*****************************************PubSubCommInit*****************************************/
     shoot_pub = PubRegister("shoot_feed", sizeof(Shoot_Upload_Data_s));
     shoot_sub = SubRegister("shoot_cmd", sizeof(Shoot_Ctrl_Cmd_s));
 }
 
+
+/************************************************************************************************
+***************************************      Function      **************************************
+*************************************************************************************************/
+
+/***************************************   MoveShoot   ******************************************/
 static void ShootStateSet()
 {
     if (shoot_cmd_recv.shoot_mode == SHOOT_OFF)
@@ -115,6 +128,9 @@ static void ShootStateSet()
     }
 }
 
+/**
+ * @brief MoveLoader
+ */
 static void ShootRateSet()
 {
     // 若不在休眠状态,根据robotCMD传来的控制模式进行拨盘电机参考值设定和模式切换
@@ -142,11 +158,8 @@ static void ShootRateSet()
     }
 }
 
-
-/*
-
 /**
- * @brief
+ * @brief MoveFriction
  */
 static void ShootSpeedSet()
 {
@@ -161,33 +174,28 @@ static void ShootSpeedSet()
         DJIMotorSetRef(friction_r, 0);
     }
 }
-
-static void JudgeCmdError()
-{
-    if(friction_l->measure.real_current==0||friction_r->measure.real_current==0)
-    shoot_feedback_data.cmd_error_flag=0;
-    else
-    shoot_feedback_data.cmd_error_flag=1;
-}
-
+/*****************************************FeedbackData*****************************************/
 static void SendShootData()
 {
     shoot_feedback_data.loader_speed_aps=loader->measure.speed_aps;
 }
 
+
+/************************************************************************************************
+***************************************        TASK        **************************************
+*************************************************************************************************/
 /* 机器人发射机构控制核心任务 */
 void ShootTask()
 {
+
+/**************************************  GetSubData  **************************************/
     // 从cmd获取控制数据
     SubGetMessage(shoot_sub, &shoot_cmd_recv);
-    //发射启停
+
     ShootStateSet();
-    //射频设定
     ShootRateSet();
-    //射速设定
     ShootSpeedSet();
-    //模块离线检测
-    //JudgeCmdError();
+    
     //给发布中心电机实际情况，从而调节拨盘电机的模式
     SendShootData();
     // 反馈数据,用于卡弹反馈（后续再加个模块离线）

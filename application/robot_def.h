@@ -46,15 +46,10 @@
  *
  */
 // 底盘模式设置
-/**
- * @brief 后续考虑修改为云台跟随底盘,而不是让底盘去追云台,云台的惯量比底盘小.
- *
- */
 typedef enum
 {
     CHASSIS_ZERO_FORCE = 0,    // 电流零输入
     CHASSIS_ROTATE,            // 小陀螺模式
-    CHASSIS_NO_FOLLOW,         // 不跟随，允许全向平移
     CHASSIS_FOLLOW_GIMBAL_YAW, // 跟随模式，底盘叠加角度环控制
 } chassis_mode_e;
 
@@ -62,8 +57,7 @@ typedef enum
 typedef enum
 {
     GIMBAL_ZERO_FORCE = 0, // 电流零输入
-    GIMBAL_FREE_MODE,      // 云台自由运动模式,即与底盘分离(底盘此时应为NO_FOLLOW)反馈值为电机total_angle;似乎可以改为全部用IMU数据?
-    GIMBAL_GYRO_MODE,      // 云台陀螺仪反馈模式,反馈值为陀螺仪pitch,total_yaw_angle,底盘可以为小陀螺和跟随模式
+    GIMBAL_GYRO_MODE,  
 } gimbal_mode_e;
 
 // 发射模式设置
@@ -82,8 +76,6 @@ typedef enum
 {
     LOAD_STOP = 0,  // 停止发射
     LOAD_REVERSE,   // 反转
-    LOAD_1_BULLET,  // 单发
-    LOAD_3_BULLET,  // 三发
     LOAD_BURSTFIRE, // 连发
 } loader_mode_e;
 
@@ -93,7 +85,7 @@ typedef enum
     FIND_Enermy,
     AUTO_OFF,
 }AutoAim_mode_e;
-// 功率限制,从裁判系统获取,是否有必要保留?
+
 typedef struct
 { // 功率控制
     uint16_t cap_vol;;
@@ -102,12 +94,8 @@ typedef struct
 /* ----------------用于记录时间或标志位的结构体---------------- */
 typedef struct
 {
-    float t_shoot;
-    float t_pitch;
-    float t_cmd_error;
     float T_Vision; 
     uint8_t aim_flag;
-    uint8_t shoot_flag;
     uint8_t cmd_error_flag;
     uint8_t fire_flag;
     uint8_t reverse_flag;
@@ -130,7 +118,6 @@ typedef struct
     float chassis_rotate_buff;
     float chassis_speed_buff;
     uint16_t power_limit;
-    
 } Chassis_Ctrl_Cmd_s;
 
 // cmd发布的云台控制数据,由gimbal订阅
@@ -151,7 +138,6 @@ typedef struct
     shoot_mode_e shoot_mode;
     loader_mode_e loader_mode;
     friction_mode_e friction_mode;
-    uint8_t rest_heat;
     float shoot_rate; // 连续发射的射频,unit per s,发/秒
 } Shoot_Ctrl_Cmd_s;
 
@@ -163,15 +149,7 @@ typedef struct
 
 typedef struct
 {
-    // 后续增加底盘的真实速度
-    // float real_vx;
-    // float real_vy;
-    // float real_wz;
-
-    uint8_t rest_heat;           // 剩余枪口热量
     Enemy_Color_e enemy_color;   // 1 for blue, 0 for red
-    uint8_t over_heat_flag;
-    uint8_t cmd_error_flag;
     uint8_t power_flag;
     uint16_t vol;
 } Chassis_Upload_Data_s;
@@ -181,13 +159,11 @@ typedef struct
 {
     attitude_t gimbal_imu_data;
     uint16_t yaw_motor_single_round_angle;
-    uint8_t cmd_error_flag;
     float init_location;
 } Gimbal_Upload_Data_s;
 
 typedef struct
 {
-    uint8_t cmd_error_flag;
     int16_t loader_speed_aps;
 } Shoot_Upload_Data_s;
 
