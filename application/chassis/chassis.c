@@ -82,8 +82,6 @@ void ChassisInit()
     motor_lb = DJIMotorInit(&chassis_motor_config);
 
 /****************************************SuperCapCommInit****************************************/
-
-
     SuperCap_Init_Config_s capconfig = {
             .can_config = {
                 .can_handle = &hcan1,

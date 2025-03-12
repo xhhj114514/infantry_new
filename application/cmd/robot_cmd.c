@@ -121,7 +121,6 @@ static void CalcOffsetAngle()
 static void GimbalPitchLimit()
 {
     gimbal_cmd_send.gimbal_mode=GIMBAL_GYRO_MODE;
-
     // //云台软件限位
     if(gimbal_cmd_send.pitch<PITCH_MIN_ANGLE)
     gimbal_cmd_send.pitch=PITCH_MIN_ANGLE;
@@ -626,6 +625,8 @@ static void AnythingStop()
     //重置与小电脑通信失败的标志位
     DataLebel.cmd_error_flag=0;
 }
+
+/**************************************  SetMode   **************************************/
 
 /**
  * @brief 根据遥控器开关的不同位置，执行不同的函数
