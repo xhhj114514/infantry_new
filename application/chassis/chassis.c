@@ -154,7 +154,54 @@ static void ChassisOutput()
 /*****************************************SendToPowerLimitBoard*****************************************/
 static void SendPowerData()
 {
-    power_data=chassis_cmd_recv.power_limit+27;    
+    if( chassis_cmd_recv.robot_level<=6)
+    {
+        if(chassis_feedback_data.vol<=20)
+        {
+            if(chassis_cmd_recv.buffer_energy<=60&&chassis_cmd_recv.buffer_energy>40)
+            power_data=80;
+            else if(chassis_cmd_recv.buffer_energy<=40&&chassis_cmd_recv.buffer_energy>20)
+            power_data=65;
+            else if(chassis_cmd_recv.buffer_energy<=20)
+            power_data=chassis_cmd_recv.power_limit;
+        }
+        else
+        {
+            power_data=chassis_cmd_recv.power_limit+5;
+        }
+    }
+    else if( chassis_cmd_recv.robot_level>=6&&chassis_cmd_recv.robot_level<=8)
+    {
+        if(chassis_feedback_data.vol<=20)
+        {
+            if(chassis_cmd_recv.buffer_energy<=60&&chassis_cmd_recv.buffer_energy>40)
+            power_data=90;
+            else if(chassis_cmd_recv.buffer_energy<=40&&chassis_cmd_recv.buffer_energy>20)
+            power_data=80;
+            else if(chassis_cmd_recv.buffer_energy<=20)
+            power_data=chassis_cmd_recv.power_limit;
+        }
+        else
+        {
+            power_data=chassis_cmd_recv.power_limit+5;
+        }
+    }
+    else
+    {
+        if(chassis_feedback_data.vol<=20)
+        {
+            if(chassis_cmd_recv.buffer_energy<=60&&chassis_cmd_recv.buffer_energy>40)
+            power_data=105;
+            else if(chassis_cmd_recv.buffer_energy<=40&&chassis_cmd_recv.buffer_energy>20)
+            power_data=95;
+            else if(chassis_cmd_recv.buffer_energy<=20)
+            power_data=chassis_cmd_recv.power_limit;
+        }
+        else
+        {
+            power_data=chassis_cmd_recv.power_limit+5;
+        }
+    }
     chassis_feedback_data.vol=cap->cap_msg.vol;
 }
 

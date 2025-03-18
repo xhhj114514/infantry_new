@@ -32,7 +32,7 @@ static Chassis_Ctrl_Cmd_s chassis_cmd_send;             // 发送给底盘应用
 static Chassis_Upload_Data_s chassis_fetch_data;        // 从底盘应用接收的反馈信息信息
 static float chassis_speed_buff_1,chassis_rotate_buff_1;//1是无超电时的等级加成
 static float chassis_speed_buff_2,chassis_rotate_buff_2;//2是有超电时的等级加成
-
+static float chassis_speed_buff_3;//无陀螺
 /************************************** GimbalUsed **************************************/
 static Publisher_t *gimbal_cmd_pub;                     // 云台控制消息发布者
 static Subscriber_t *gimbal_feed_sub;                   // 云台反馈信息订阅者
@@ -49,7 +49,7 @@ static Shoot_Upload_Data_s shoot_fetch_data;            // 从发射获取的反
 /****************************************  Other  ****************************************/
 static DataLebel_t DataLebel;                           // 用于记录时间或标志位
 static  BuzzzerInstance *aim_success_buzzer;            // 判断是否能击打目标
-
+static float cnt1;
 
 /********************************************************************************************
 ***************************************      Init     ***************************************
@@ -95,22 +95,24 @@ void RobotCMDInit()
 static void CalcOffsetAngle()
 {
     // 别名angle提高可读性,不然太长了不好看,虽然基本不会动这个函数
-    static float angle;
+    static float angle,yaw_align_angle;
     angle = gimbal_fetch_data.yaw_motor_single_round_angle; // 从云台获取的当前yaw电机单圈角度
+
+
 #if YAW_ECD_GREATER_THAN_4096                               // 如果大于180度
-    if (angle > YAW_ALIGN_ANGLE && angle <= 180.0f + YAW_ALIGN_ANGLE)
-        chassis_cmd_send.offset_angle = angle - YAW_ALIGN_ANGLE;
-    else if (angle > 180.0f + YAW_ALIGN_ANGLE)
-        chassis_cmd_send.offset_angle = angle - YAW_ALIGN_ANGLE - 360.0f;
+    if (angle > yaw_align_angle && angle <= 180.0f + yaw_align_angle)
+        chassis_cmd_send.offset_angle = angle - yaw_align_angle;
+    else if (angle > 180.0f + yaw_align_angle)
+        chassis_cmd_send.offset_angle = angle - yaw_align_angle - 360.0f;
     else
-        chassis_cmd_send.offset_angle = angle - YAW_ALIGN_ANGLE;
+        chassis_cmd_send.offset_angle = angle - yaw_align_angle;
 #else // 小于180度
-    if (angle > YAW_ALIGN_ANGLE)
-        chassis_cmd_send.offset_angle = angle - YAW_ALIGN_ANGLE;
-    else if (angle <= YAW_ALIGN_ANGLE && angle >= YAW_ALIGN_ANGLE - 180.0f)
-        chassis_cmd_send.offset_angle = angle - YAW_ALIGN_ANGLE;
+    if (angle > YAW_ALIGN_ANGLE_1)
+        chassis_cmd_send.offset_angle = angle - YAW_ALIGN_ANGLE_1;
+    else if (angle <= yaw_align_angle && angle >= YAW_ALIGN_ANGLE_1 - 180.0f)
+        chassis_cmd_send.offset_angle = angle - YAW_ALIGN_ANGLE_1;
     else
-        chassis_cmd_send.offset_angle = angle - YAW_ALIGN_ANGLE + 360.0f;
+        chassis_cmd_send.offset_angle = angle - YAW_ALIGN_ANGLE_1 + 360.0f;
 #endif
 }
 
@@ -136,16 +138,8 @@ static void GimbalPitchLimit()
  */
 static void VisionJudge()
 {
-
-    //DataLebel.T_Vision用于检测小电脑的离线，取值为[-1,1]
-    //在-0.1到1且小电脑未离线时，读取深度
-    DataLebel.T_Vision=sin(DWT_GetTimeline_s());
-    if(DataLebel.T_Vision>-0.1&&DataLebel.T_Vision<1&&DataLebel.cmd_error_flag==0)
-    {
-        gimbal_cmd_send.last_deep= minipc_recv_data->Vision.deep;
-    }
     //有深度代表有视觉信息
-    if(minipc_recv_data->Vision.deep!=0&&DataLebel.cmd_error_flag==0)
+    if(minipc_recv_data->Vision.deep!=0)
     {
         DataLebel.aim_flag=1;
         //检测到装甲板，开启蜂鸣器
@@ -155,7 +149,7 @@ static void VisionJudge()
         {
             aim_success_buzzer->loudness=0.5*(1/abs(minipc_recv_data->Vision.yaw));
         }
-        else if(abs(minipc_recv_data->Vision.yaw)<1 && abs(minipc_recv_data->Vision.pitch)<1)
+        else if(abs(minipc_recv_data->Vision.yaw)<1)
         {
             //离装甲板距离较近时，开火
             aim_success_buzzer->loudness=0.5;
@@ -167,14 +161,6 @@ static void VisionJudge()
             {
                 DataLebel.fire_flag=1;
             }
-        }
-        //在DataLebel.T_Vision<-0.2时，此时不读取深度，但如果之前读取到的深度与实际深度一致，证明小电脑离线，停止自瞄
-        if(minipc_recv_data->Vision.deep-gimbal_cmd_send.last_deep==0&&DataLebel.T_Vision<-0.2)
-        {
-            DataLebel.cmd_error_flag=1;
-            DataLebel.fire_flag=0;
-            DataLebel.aim_flag=0;
-            AlarmSetStatus(aim_success_buzzer, ALARM_OFF);
         }
     }
      //检测不到装甲板，关蜂鸣器，关火
@@ -191,7 +177,7 @@ static void VisionJudge()
  */
 static void PowerCapJudge()
 {
-    if(chassis_fetch_data.vol>16&&chassis_fetch_data.vol<23)
+    if(chassis_fetch_data.vol>12&&chassis_fetch_data.vol<23)
     {
         chassis_fetch_data.power_flag=1;
     }
@@ -212,12 +198,16 @@ static void ChassisRotateSet()
     {
         //底盘跟随
         case CHASSIS_FOLLOW_GIMBAL_YAW: 
-            chassis_cmd_send.wz =-2.0*abs(chassis_cmd_send.offset_angle)*chassis_cmd_send.offset_angle;
+            chassis_cmd_send.wz =-20.0*abs(chassis_cmd_send.offset_angle)*chassis_cmd_send.offset_angle;
         break;
         //小陀螺
         case CHASSIS_ROTATE: 
-            chassis_cmd_send.wz = 2600*chassis_cmd_send.chassis_rotate_buff;
+            chassis_cmd_send.wz =(10000+100*sin(DWT_GetTimeline_s()))*chassis_cmd_send.chassis_rotate_buff;
         break;
+        case CHASSIS_MOVE:
+            chassis_cmd_send.wz =-10.0*abs(chassis_cmd_send.offset_angle)*chassis_cmd_send.offset_angle;
+        break;
+
         //未知
         default:
         break;
@@ -251,8 +241,7 @@ static void BasicSet()
 static void GimbalRC()
 {
     gimbal_cmd_send.yaw -= 0.0005f * (float)rc_data[TEMP].rc.rocker_right_x;//0
-    gimbal_cmd_send.pitch -= 0.0001f * (float)rc_data[TEMP].rc.rocker_right_y;
-    gimbal_cmd_send.real_pitch= ((gimbal_fetch_data.gimbal_imu_data.Pitch)-gimbal_fetch_data.init_location)/57.39;
+    gimbal_cmd_send.pitch -= 0.00003f * (float)rc_data[TEMP].rc.rocker_right_y;
 }
 
 /**
@@ -262,7 +251,6 @@ static void GimbalRC()
 static void GimbalAC()
 {
     gimbal_cmd_send.yaw-=0.007f*minipc_recv_data->Vision.yaw;   //往右获得的yaw是减
-    gimbal_cmd_send.pitch -= 0.009f*minipc_recv_data->Vision.pitch;
 }
 
 /************************************** ChassisSet   **************************************/
@@ -272,8 +260,8 @@ static void GimbalAC()
  */
 static void ChassisRC()
 {
-    chassis_cmd_send.vx = 30.0f * (float)rc_data[TEMP].rc.rocker_left_y; // _水平方向
-    chassis_cmd_send.vy =-30.0f * (float)rc_data[TEMP].rc.rocker_left_x; // 竖直方向
+    chassis_cmd_send.vx =- 30.0f * (float)rc_data[TEMP].rc.rocker_left_y; // _水平方向
+    chassis_cmd_send.vy =30.0f * (float)rc_data[TEMP].rc.rocker_left_x; // 竖直方向
     chassis_cmd_send.chassis_rotate_buff=1;
     chassis_cmd_send.chassis_speed_buff=1;
     if (switch_is_down(rc_data[TEMP].rc.switch_left))
@@ -318,13 +306,21 @@ static void ShootRC()
  */
 static void AutoAimSet()
 {
-    if(DataLebel.aim_flag==1)
+    GimbalAC();
+    if(rc_data[TEMP].mouse.press_l==1)
     {
-        GimbalAC();
-        if(DataLebel.fire_flag==1)
+        if(DataLebel.reverse_flag==1)
+        {
+            shoot_cmd_send.loader_mode = LOAD_REVERSE;
+        }
+        else
         {
             shoot_cmd_send.loader_mode = LOAD_BURSTFIRE;
         }
+    }
+    else
+    {
+        shoot_cmd_send.loader_mode = LOAD_STOP;
     }
 }
 
@@ -341,7 +337,7 @@ static void RemoteControlSet()
 
     if(switch_is_up(rc_data[TEMP].rc.switch_left)) 
     {
-        gimbal_cmd_send.autoaim_mode=AUTO_ON;
+        gimbal_cmd_send.autoaim_mode=ANGRY;
         AutoAimSet();
         if(DataLebel.aim_flag!=1)
         {
@@ -363,7 +359,7 @@ static void RemoteControlSet()
 static void NoneAutoMouseControl()
 {
     gimbal_cmd_send.yaw -= (float)rc_data[TEMP].mouse.x / 660 *3 ; 
-    gimbal_cmd_send.pitch += (float)rc_data[TEMP].mouse.y / 660/57 ;
+    gimbal_cmd_send.pitch += (float)rc_data[TEMP].mouse.y / 660/57*1.5 ;
     if(rc_data[TEMP].mouse.press_l==1)
     {
         if(DataLebel.reverse_flag==1)
@@ -392,20 +388,31 @@ static void MouseControl()
 {
     if(rc_data[TEMP].mouse.press_r==1)
     {
-        gimbal_cmd_send.autoaim_mode=AUTO_ON;
+        if(DataLebel.aim_flag==1)
+        {
+            gimbal_cmd_send.autoaim_mode=ANGRY;
+        }
+        else
+        {
+            gimbal_cmd_send.autoaim_mode=NOTHING;
+        }
     }
-    else
+    else if(rc_data[TEMP].mouse.press_r==0)
     {
-        gimbal_cmd_send.autoaim_mode=AUTO_OFF;
+        if(DataLebel.aim_flag==1)
+        {
+            gimbal_cmd_send.autoaim_mode=FOUND;
+        }
+        else
+        {
+            gimbal_cmd_send.autoaim_mode=AUTO_OFF;
+        }
+    
     }
-
-    if(gimbal_cmd_send.autoaim_mode==AUTO_ON)
+    if(gimbal_cmd_send.autoaim_mode==ANGRY)
     {
         AutoAimSet();
-        if(DataLebel.aim_flag!=1)
-        {
-            NoneAutoMouseControl();
-        }
+        gimbal_cmd_send.pitch += (float)rc_data[TEMP].mouse.y / 660/57*1.5 ;
     }
     else
     {
@@ -418,19 +425,23 @@ static void MouseControl()
  */
 static void KeyControl()
 {
+
     //根据R键控制底盘模式
     switch (rc_data[TEMP].key_count[KEY_PRESS][Key_R] % 2) 
     {
     case 0:
+        if(rc_data[TEMP].key_count[KEY_PRESS][Key_C]%2==0)
         chassis_cmd_send.chassis_mode =CHASSIS_FOLLOW_GIMBAL_YAW;
+        else
+        chassis_cmd_send.chassis_mode =CHASSIS_MOVE;
         break;
     default:
         chassis_cmd_send.chassis_mode =CHASSIS_ROTATE;
     }
 
     // 根据W/S键设置纵向速度，根据A/D键设置横向速度
-    chassis_cmd_send.vx = (rc_data[TEMP].key[KEY_PRESS].w * 10000 - rc_data[TEMP].key[KEY_PRESS].s * 10000)*chassis_cmd_send.chassis_speed_buff; 
-    chassis_cmd_send.vy = (rc_data[TEMP].key[KEY_PRESS].d * 10000 - rc_data[TEMP].key[KEY_PRESS].a * 10000)*chassis_cmd_send.chassis_speed_buff;
+    chassis_cmd_send.vx = -(rc_data[TEMP].key[KEY_PRESS].w * 10000 - rc_data[TEMP].key[KEY_PRESS].s * 10000)*chassis_cmd_send.chassis_speed_buff; 
+    chassis_cmd_send.vy = -(rc_data[TEMP].key[KEY_PRESS].d * 10000 - rc_data[TEMP].key[KEY_PRESS].a * 10000)*chassis_cmd_send.chassis_speed_buff;
 
     // 根据机器人等级设置速度和旋转缓冲系数(无超电使用)
     switch (referee_data->GameRobotState.robot_level)
@@ -480,113 +491,94 @@ static void KeyControl()
         chassis_speed_buff_1  = 1;
         break;
     }
-// 根据Shift键和功率标志进一步调整速度和旋转缓冲系数
 
-    switch (rc_data[TEMP].key[KEY_PRESS].shift)
+    //3级以下，对标功率优先3级（血量优先6级）
+    if(referee_data->GameRobotState.robot_level<=3)
     {
-        case 1:
+        chassis_speed_buff_2= 1.6;
+        // 8 1.45
+        if(chassis_fetch_data.vol<=24&&chassis_fetch_data.vol>=18)
         {
-            if(chassis_fetch_data.power_flag==1)
-            {
-                //3级以下，对标功率优先3级（血量优先6级），
-                if(referee_data->GameRobotState.robot_level<=3)
-                {
-                    chassis_speed_buff_2= 1.5;
-                    if(chassis_fetch_data.vol<=21&&chassis_fetch_data.vol>=16)
-                    {
-                        chassis_rotate_buff_2= 1.16*1.12*(chassis_fetch_data.vol-16)*0.2;
-                    }
-                    else
-                    {
-                        chassis_rotate_buff_2= 1.16*1.13;
-                    }
-                }
-                //4-6，对标功率优先6级（血量优先8级），
-                else if (referee_data->GameRobotState.robot_level>3&&referee_data->GameRobotState.robot_level<=6)
-                {
-                    chassis_speed_buff_2= 1.6;
-                    if(chassis_fetch_data.vol<=21&&chassis_fetch_data.vol>=16)
-                    {
-                        chassis_rotate_buff_2= 1.3*1.25*(chassis_fetch_data.vol-16)*0.2;
-                    }
-                    else
-                    {
-                        chassis_rotate_buff_2= 1.3*1.25;
-                    }
-                }
-                //7-10，对标功率优先10级（血量优先8级），
-                else if (referee_data->GameRobotState.robot_level>6&&referee_data->GameRobotState.robot_level<=10)
-                {
-                    chassis_speed_buff_2= 1.81;
-                    if(chassis_fetch_data.vol<=21&&chassis_fetch_data.vol>=16)
-                    {
-                        chassis_rotate_buff_2= 1.55*1.09*(chassis_fetch_data.vol-16)*0.2;
-                    }
-                    else
-                    {
-                        chassis_rotate_buff_2= 1.55*1.09;
-                    }     
-                }
-            }
-            else
-            {
-                chassis_speed_buff_2= chassis_speed_buff_1+0.2;
-                chassis_rotate_buff_2= chassis_speed_buff_1;
-            }
-        } 
-        break;
-    default:
-            if(chassis_fetch_data.power_flag==1)
-            {
-                //3级以下，对标功率优先3级（血量优先6级），
-                if(referee_data->GameRobotState.robot_level<=3)
-                {
-                    chassis_speed_buff_2= 1.33;
-                    if(chassis_fetch_data.vol<=21&&chassis_fetch_data.vol>=16)
-                    {
-                        chassis_rotate_buff_2= 1.16*1.12*(chassis_fetch_data.vol-16)*0.2;
-                    }
-                    else
-                    {
-                        chassis_rotate_buff_2= 1.16*1.13;
-                    }
-                }
-                //4-6，对标功率优先6级（血量优先8级），
-                else if (referee_data->GameRobotState.robot_level>3&&referee_data->GameRobotState.robot_level<=6)
-                {
-                    chassis_speed_buff_2= 1.43;
-                    if(chassis_fetch_data.vol<=21&&chassis_fetch_data.vol>=16)
-                    {
-                        chassis_rotate_buff_2= 1.3*1.25*(chassis_fetch_data.vol-16)*0.2;
-                    }
-                    else
-                    {
-                        chassis_rotate_buff_2= 1.3*1.25;
-                    }
-                }
-                //7-10，对标功率优先10级（血量优先8级），
-                else if (referee_data->GameRobotState.robot_level>6&&referee_data->GameRobotState.robot_level<=10)
-                {
-                    chassis_speed_buff_2= 1.81;
-                    if(chassis_fetch_data.vol<=21&&chassis_fetch_data.vol>=16)
-                    {
-                        chassis_rotate_buff_2= 1.55*1.09*(chassis_fetch_data.vol-16)*0.2;
-                    }
-                    else
-                    {
-                        chassis_rotate_buff_2= 1.55*1.09;
-                    }     
-                }
-            }
-            else
-            {
-                chassis_speed_buff_2= chassis_speed_buff_1;
-                chassis_rotate_buff_2= chassis_rotate_buff_1;
-            } 
-        break;
+            chassis_rotate_buff_2= 1.42*((chassis_fetch_data.vol-17)*0.01+1);
+        }
+        //7 1.45
+        else if(chassis_fetch_data.vol<18&&chassis_fetch_data.vol>=14)
+        {
+            chassis_rotate_buff_2= 1.36*((chassis_fetch_data.vol-13)*0.012+1);
+        }
+        //6 1.38
+        else if(chassis_fetch_data.vol<14&&chassis_fetch_data.vol>=10)
+        {
+            chassis_rotate_buff_2= 1.31*((chassis_fetch_data.vol-9)*0.0114+1);
+        }
+        //5 1.3
+        else
+        {
+            chassis_rotate_buff_2=chassis_speed_buff_1;
+        }
     }
+    //4-6，对标功率优先6级（血量优先8级），
+    else if (referee_data->GameRobotState.robot_level>3&&referee_data->GameRobotState.robot_level<=6)
+    {
+        chassis_speed_buff_2= 1.72;
+        //9 1.55
+        if(chassis_fetch_data.vol<=24&&chassis_fetch_data.vol>=18)
+        {
+            chassis_rotate_buff_2= 1.44*((chassis_fetch_data.vol-17)*0.011+1);
+        }
+        //8 1.45
+        else if(chassis_fetch_data.vol<18&&chassis_fetch_data.vol>=14)
+        {
+            chassis_rotate_buff_2= 1.4*((chassis_fetch_data.vol-13)*0.01+1);
+        }
+        //7 1.38
+        else if(chassis_fetch_data.vol<14&&chassis_fetch_data.vol>=10)
+        {
+            chassis_rotate_buff_2= 1.32*((chassis_fetch_data.vol-9)*0.015+1);
+        }
+        //6 1.3
+        else
+        {
+            chassis_rotate_buff_2=chassis_speed_buff_1;
+        }
+    }
+    //7-10，对标功率优先10级（血量优先8级），
+    else if (referee_data->GameRobotState.robot_level>6&&referee_data->GameRobotState.robot_level<=10)
+    {
+        chassis_speed_buff_2= 1.81;
+        //10
+        if(chassis_fetch_data.vol<=24&&chassis_fetch_data.vol>=18)
+        {
+            chassis_rotate_buff_2= 1.55*((chassis_fetch_data.vol-17)*0.016+1);
+        }
+        //9 1.55
+        else if(chassis_fetch_data.vol<18&&chassis_fetch_data.vol>=14)
+        {
+            chassis_rotate_buff_2= 1.45*((chassis_fetch_data.vol-13)*0.013+1);
+        }
+        //8 1.45
+        else if(chassis_fetch_data.vol<14&&chassis_fetch_data.vol>=10)
+        {
+            chassis_rotate_buff_2= 1.41*((chassis_fetch_data.vol-9)*0.01+1);
+        }
+        //7 1.38
+        else
+        {
+            chassis_rotate_buff_2=chassis_speed_buff_1;
+        }    
+    }
+
     //选择最快的那个速度
-    chassis_cmd_send.chassis_speed_buff = (chassis_speed_buff_1 >= chassis_speed_buff_2) ? chassis_speed_buff_1 : chassis_speed_buff_2;
+    if(chassis_cmd_send.chassis_mode==CHASSIS_FOLLOW_GIMBAL_YAW)
+    {
+        chassis_speed_buff_3=chassis_speed_buff_2+0.6;
+    }
+    else
+    {
+        chassis_speed_buff_3=chassis_speed_buff_2;
+    }
+
+    chassis_cmd_send.chassis_speed_buff = (chassis_speed_buff_1 >= chassis_speed_buff_3) ? chassis_speed_buff_1 : chassis_speed_buff_3;
 
     // 选择最快的旋转速度
     chassis_cmd_send.chassis_rotate_buff = (chassis_rotate_buff_1 >= chassis_rotate_buff_2) ? chassis_rotate_buff_1 : chassis_rotate_buff_2;
@@ -657,7 +649,6 @@ static void SendToUIData()
     ui_data.autoaim_mode=gimbal_cmd_send.autoaim_mode;
     ui_data.chassis_mode=chassis_cmd_send.chassis_mode;
     ui_data.loader_mode=shoot_cmd_send.loader_mode;
-    ui_data.shoot_mode=shoot_cmd_send.shoot_mode;
     ui_data.chassis_power_data.cap_vol=chassis_fetch_data.vol;
 }
 
@@ -671,6 +662,13 @@ static void JudgeEnermy()
     {
         minipc_send_data.Vision.detect_color=COLOR_BLUE;
     }
+}
+
+static void SendPowerLimit()
+{
+    chassis_cmd_send.buffer_energy=referee_data->PowerHeatData.buffer_energy;
+    chassis_cmd_send.power_limit=referee_data->GameRobotState.chassis_power_limit;
+    chassis_cmd_send.robot_level=referee_data->GameRobotState.robot_level;
 }
 
 /*********************************************************************************************
@@ -692,4 +690,5 @@ void RobotCMDTask()
     PubPushMessage(gimbal_cmd_pub, (void *)&gimbal_cmd_send);
     SendMinipcData(&minipc_send_data);
     SendToUIData();
+    SendPowerLimit();
 }

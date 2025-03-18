@@ -112,9 +112,6 @@ void get_protocol_info_vision(uint8_t *rx_buf,
     if (protocol_heade_Check(&pro, rx_buf)==1) 
     {
         date_length = OFFSET_BYTE + pro.header.data_length;
-        //if (CRC16_Check_Sum(rx_buf, date_length)) {
-            *flags_register = (rx_buf[7] << 8) | rx_buf[6];
-
             // 将接收到的数据复制到Minipc_Recv_s结构体中
             recv_data->Vision.header = rx_buf[0];
             memcpy(&recv_data->Vision.yaw, &rx_buf[1], sizeof(float));

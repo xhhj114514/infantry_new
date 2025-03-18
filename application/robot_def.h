@@ -13,7 +13,9 @@
 
 /* 机器人重要参数定义,注意根据不同机器人进行修改,浮点数需要以.0或f结尾,无符号以u结尾 */
 // 云台参数
-#define YAW_CHASSIS_ALIGN_ECD 4140  // 云台和底盘对齐指向相同方向时的电机编码器值,若对云台有机械改动需要修改
+#define YAW_CHASSIS_ALIGN_ECD_1 8140  // 云台和底盘对齐指向相同方向时的电机编码器值,若对云台有机械改动需要修改
+#define YAW_CHASSIS_ALIGN_ECD_2 7194  // 云台和底盘对齐指向相同方向时的电机编码器值,若对云台有机械改动需要修改
+
 #define YAW_ECD_GREATER_THAN_4096 1 // ALIGN_ECD值是否大于4096,是为1,否为0;用于计算云台偏转角度
 #define PITCH_HORIZON_ECD 3412      // 云台处于水平位置时编码器值,若对云台有机械改动需要修改
 #define PITCH_MAX_ANGLE 0.82          // 云台竖直方向最大角度 (注意反馈如果是陀螺仪，则填写陀螺仪的角度)
@@ -31,7 +33,9 @@
 #define REDUCTION_RATIO_WHEEL 19.0f // 电机减速比,因为编码器量测的是转子的速度而不是输出轴的速度故需进行转换
 
 // 私有宏,自动将编码器转换成角度值
-#define YAW_ALIGN_ANGLE (YAW_CHASSIS_ALIGN_ECD * ECD_ANGLE_COEF_DJI) // 对齐时的角度,0-360
+#define YAW_ALIGN_ANGLE_1 (YAW_CHASSIS_ALIGN_ECD_1 * ECD_ANGLE_COEF_DJI) // 对齐时的角度,0-360
+#define YAW_ALIGN_ANGLE_2 (YAW_CHASSIS_ALIGN_ECD_2 * ECD_ANGLE_COEF_DJI) // 对齐时的角度,0-360
+
 #define PTICH_HORIZON_ANGLE (PITCH_HORIZON_ECD * ECD_ANGLE_COEF_DJI) // pitch水平时电机的角度,0-360
 
 /* 根据robot_def.h中的macro自动计算的参数 */
@@ -50,6 +54,7 @@ typedef enum
 {
     CHASSIS_ZERO_FORCE = 0,    // 电流零输入
     CHASSIS_ROTATE,            // 小陀螺模式
+    CHASSIS_MOVE,              // 侧身模式
     CHASSIS_FOLLOW_GIMBAL_YAW, // 跟随模式，底盘叠加角度环控制
 } chassis_mode_e;
 
@@ -81,9 +86,10 @@ typedef enum
 
 typedef enum
 {
-    AUTO_ON=0,
-    FIND_Enermy,
-    AUTO_OFF,
+    ANGRY=0,//红
+    FOUND,//紫
+    AUTO_OFF,//白
+    NOTHING,//白
 }AutoAim_mode_e;
 
 typedef struct
@@ -118,6 +124,8 @@ typedef struct
     float chassis_rotate_buff;
     float chassis_speed_buff;
     uint16_t power_limit;
+    uint16_t buffer_energy;
+    uint8_t robot_level;
 } Chassis_Ctrl_Cmd_s;
 
 // cmd发布的云台控制数据,由gimbal订阅

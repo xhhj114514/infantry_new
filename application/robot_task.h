@@ -47,7 +47,7 @@ void OSTaskInit()
     osThreadDef(robottask, StartROBOTTASK, osPriorityNormal, 0, 1024);
     robotTaskHandle = osThreadCreate(osThread(robottask), NULL);
 
-    osThreadDef(uitask, StartUITASK, osPriorityNormal, 0, 512);
+    osThreadDef(uitask, StartUITASK, osPriorityNormal, 0, 1024);
     uiTaskHandle = osThreadCreate(osThread(uitask), NULL);
 }
 
@@ -118,7 +118,7 @@ __attribute__((noreturn)) void StartROBOTTASK(void const *argument)
         robot_dt = DWT_GetTimeline_ms() - robot_start;
         if (robot_dt > 5)
             LOGERROR("[freeRTOS] ROBOT core Task is being DELAY! dt = [%f]", &robot_dt);
-        osDelay(5);
+        osDelay(2);
     }
 }
 
