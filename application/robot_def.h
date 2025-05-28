@@ -8,12 +8,11 @@
 
 /* 开发板类型定义,烧录时注意不要弄错对应功能;修改定义后需要重新编译,只能存在一个定义! */
 #define ONE_BOARD // 单板控制整车
-
 #define VISION_USE_UART // 使用串口发送视觉数据
 
 /* 机器人重要参数定义,注意根据不同机器人进行修改,浮点数需要以.0或f结尾,无符号以u结尾 */
 // 云台参数
-#define YAW_CHASSIS_ALIGN_ECD_1 8140  // 云台和底盘对齐指向相同方向时的电机编码器值,若对云台有机械改动需要修改
+#define YAW_CHASSIS_ALIGN_ECD_1 4816  // 云台和底盘对齐指向相同方向时的电机编码器值,若对云台有机械改动需要修改
 #define YAW_CHASSIS_ALIGN_ECD_2 7194  // 云台和底盘对齐指向相同方向时的电机编码器值,若对云台有机械改动需要修改
 
 #define YAW_ECD_GREATER_THAN_4096 1 // ALIGN_ECD值是否大于4096,是为1,否为0;用于计算云台偏转角度
@@ -33,7 +32,7 @@
 #define REDUCTION_RATIO_WHEEL 19.0f // 电机减速比,因为编码器量测的是转子的速度而不是输出轴的速度故需进行转换
 
 // 私有宏,自动将编码器转换成角度值
-#define YAW_ALIGN_ANGLE_1 (YAW_CHASSIS_ALIGN_ECD_1 * ECD_ANGLE_COEF_DJI) // 对齐时的角度,0-360
+#define YAW_ALIGN_ANGLE (YAW_CHASSIS_ALIGN_ECD_1 * ECD_ANGLE_COEF_DJI) // 对齐时的角度,0-360
 #define YAW_ALIGN_ANGLE_2 (YAW_CHASSIS_ALIGN_ECD_2 * ECD_ANGLE_COEF_DJI) // 对齐时的角度,0-360
 
 #define PTICH_HORIZON_ANGLE (PITCH_HORIZON_ECD * ECD_ANGLE_COEF_DJI) // pitch水平时电机的角度,0-360

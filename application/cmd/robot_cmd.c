@@ -58,15 +58,15 @@ void RobotCMDInit()
 {
 /**************************************  HuartInit  **************************************/
     rc_data = RemoteControlInit(&huart3);               // 遥控器通信串口
-    minipc_recv_data = minipcInit(&huart1);             // 视觉通信串口
-    referee_data= UITaskInit(&huart6,&ui_data);         // UI通信串口
+    // minipc_recv_data = minipcInit(&huart1);             // 视觉通信串口
+    // referee_data= UITaskInit(&huart6,&ui_data);         // UI通信串口
 
 /**************************************GimbalCommInit**************************************/
     gimbal_cmd_pub = PubRegister("gimbal_cmd", sizeof(Gimbal_Ctrl_Cmd_s));
     gimbal_feed_sub = SubRegister("gimbal_feed", sizeof(Gimbal_Upload_Data_s));
     gimbal_cmd_send.pitch = 0;
 
-/************************************** ShootCommInit **************************************/
+// /************************************** ShootCommInit **************************************/
     shoot_cmd_pub = PubRegister("shoot_cmd", sizeof(Shoot_Ctrl_Cmd_s));
     shoot_feed_sub = SubRegister("shoot_feed", sizeof(Shoot_Upload_Data_s));
 
@@ -74,12 +74,12 @@ void RobotCMDInit()
     chassis_cmd_pub = PubRegister("chassis_cmd", sizeof(Chassis_Ctrl_Cmd_s));
     chassis_feed_sub = SubRegister("chassis_feed", sizeof(Chassis_Upload_Data_s));
 
-/**************************************   BufferInit  **************************************/
-    Buzzer_config_s aim_success_buzzer_config= {
-        .alarm_level=ALARM_LEVEL_ABOVE_MEDIUM,
-        .octave=OCTAVE_2,
-    };
-    aim_success_buzzer= BuzzerRegister(&aim_success_buzzer_config);
+// /**************************************   BufferInit  **************************************/
+//     Buzzer_config_s aim_success_buzzer_config= {
+//         .alarm_level=ALARM_LEVEL_ABOVE_MEDIUM,
+//         .octave=OCTAVE_2,
+//     };
+//     aim_success_buzzer= BuzzerRegister(&aim_success_buzzer_config);
 }
 
 
@@ -94,26 +94,14 @@ void RobotCMDInit()
  */
 static void CalcOffsetAngle()
 {
-    // 别名angle提高可读性,不然太长了不好看,虽然基本不会动这个函数
-    static float angle,yaw_align_angle;
+    static float angle;
     angle = gimbal_fetch_data.yaw_motor_single_round_angle; // 从云台获取的当前yaw电机单圈角度
-
-
-#if YAW_ECD_GREATER_THAN_4096                               // 如果大于180度
-    if (angle > yaw_align_angle && angle <= 180.0f + yaw_align_angle)
-        chassis_cmd_send.offset_angle = angle - yaw_align_angle;
-    else if (angle > 180.0f + yaw_align_angle)
-        chassis_cmd_send.offset_angle = angle - yaw_align_angle - 360.0f;
+    if (angle > YAW_ALIGN_ANGLE && angle <= 180.0f + YAW_ALIGN_ANGLE)
+        chassis_cmd_send.offset_angle = angle - YAW_ALIGN_ANGLE;
+    else if (angle > 180.0f + YAW_ALIGN_ANGLE)
+        chassis_cmd_send.offset_angle = angle - YAW_ALIGN_ANGLE - 360.0f;
     else
-        chassis_cmd_send.offset_angle = angle - yaw_align_angle;
-#else // 小于180度
-    if (angle > YAW_ALIGN_ANGLE_1)
-        chassis_cmd_send.offset_angle = angle - YAW_ALIGN_ANGLE_1;
-    else if (angle <= yaw_align_angle && angle >= YAW_ALIGN_ANGLE_1 - 180.0f)
-        chassis_cmd_send.offset_angle = angle - YAW_ALIGN_ANGLE_1;
-    else
-        chassis_cmd_send.offset_angle = angle - YAW_ALIGN_ANGLE_1 + 360.0f;
-#endif
+        chassis_cmd_send.offset_angle = angle - YAW_ALIGN_ANGLE;
 }
 
 /**
@@ -202,7 +190,7 @@ static void ChassisRotateSet()
         break;
         //小陀螺
         case CHASSIS_ROTATE: 
-            chassis_cmd_send.wz =(10000+100*sin(DWT_GetTimeline_s()))*chassis_cmd_send.chassis_rotate_buff;
+            chassis_cmd_send.wz =30000;
         break;
         case CHASSIS_MOVE:
             chassis_cmd_send.wz =-10.0*abs(chassis_cmd_send.offset_angle)*chassis_cmd_send.offset_angle;
@@ -260,8 +248,8 @@ static void GimbalAC()
  */
 static void ChassisRC()
 {
-    chassis_cmd_send.vx =- 30.0f * (float)rc_data[TEMP].rc.rocker_left_y; // _水平方向
-    chassis_cmd_send.vy =30.0f * (float)rc_data[TEMP].rc.rocker_left_x; // 竖直方向
+    chassis_cmd_send.vx =- 60.0f * (float)rc_data[TEMP].rc.rocker_left_y; // _水平方向
+    chassis_cmd_send.vy =60.0f * (float)rc_data[TEMP].rc.rocker_left_x; // 竖直方向
     chassis_cmd_send.chassis_rotate_buff=1;
     chassis_cmd_send.chassis_speed_buff=1;
     if (switch_is_down(rc_data[TEMP].rc.switch_left))
@@ -689,6 +677,6 @@ void RobotCMDTask()
     PubPushMessage(shoot_cmd_pub, (void *)&shoot_cmd_send);
     PubPushMessage(gimbal_cmd_pub, (void *)&gimbal_cmd_send);
     SendMinipcData(&minipc_send_data);
-    SendToUIData();
-    SendPowerLimit();
+    // SendToUIData();
+    // SendPowerLimit();
 }
