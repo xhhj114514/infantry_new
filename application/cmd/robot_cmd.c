@@ -61,18 +61,18 @@ void RobotCMDInit()
     // minipc_recv_data = minipcInit(&huart1);             // 视觉通信串口
     // referee_data= UITaskInit(&huart6,&ui_data);         // UI通信串口
 
-/**************************************GimbalCommInit**************************************/
-    gimbal_cmd_pub = PubRegister("gimbal_cmd", sizeof(Gimbal_Ctrl_Cmd_s));
-    gimbal_feed_sub = SubRegister("gimbal_feed", sizeof(Gimbal_Upload_Data_s));
-    gimbal_cmd_send.pitch = 0;
+// /**************************************GimbalCommInit**************************************/
+//     gimbal_cmd_pub = PubRegister("gimbal_cmd", sizeof(Gimbal_Ctrl_Cmd_s));
+//     gimbal_feed_sub = SubRegister("gimbal_feed", sizeof(Gimbal_Upload_Data_s));
+//     gimbal_cmd_send.pitch = 0;
 
 // /************************************** ShootCommInit **************************************/
     shoot_cmd_pub = PubRegister("shoot_cmd", sizeof(Shoot_Ctrl_Cmd_s));
     shoot_feed_sub = SubRegister("shoot_feed", sizeof(Shoot_Upload_Data_s));
 
-/**************************************ChassisCommInit**************************************/
-    chassis_cmd_pub = PubRegister("chassis_cmd", sizeof(Chassis_Ctrl_Cmd_s));
-    chassis_feed_sub = SubRegister("chassis_feed", sizeof(Chassis_Upload_Data_s));
+// /**************************************ChassisCommInit**************************************/
+//     chassis_cmd_pub = PubRegister("chassis_cmd", sizeof(Chassis_Ctrl_Cmd_s));
+//     chassis_feed_sub = SubRegister("chassis_feed", sizeof(Chassis_Upload_Data_s));
 
 // /**************************************   BufferInit  **************************************/
 //     Buzzer_config_s aim_success_buzzer_config= {
@@ -665,18 +665,18 @@ static void SendPowerLimit()
 void RobotCMDTask()
 {
 /**************************************  GetFetchData  **************************************/
-    SubGetMessage(chassis_feed_sub, (void *)&chassis_fetch_data);
+    // SubGetMessage(chassis_feed_sub, (void *)&chassis_fetch_data);
     SubGetMessage(shoot_feed_sub, &shoot_fetch_data);
-    SubGetMessage(gimbal_feed_sub, &gimbal_fetch_data);
+    // SubGetMessage(gimbal_feed_sub, &gimbal_fetch_data);
 
 /*************************************     Control     **************************************/
     ControlDataDeal();
  
 /**************************************    SendData    **************************************/
-    PubPushMessage(chassis_cmd_pub, (void *)&chassis_cmd_send);
+    // PubPushMessage(chassis_cmd_pub, (void *)&chassis_cmd_send);
     PubPushMessage(shoot_cmd_pub, (void *)&shoot_cmd_send);
-    PubPushMessage(gimbal_cmd_pub, (void *)&gimbal_cmd_send);
-    SendMinipcData(&minipc_send_data);
+    // PubPushMessage(gimbal_cmd_pub, (void *)&gimbal_cmd_send);
+    // SendMinipcData(&minipc_send_data);
     // SendToUIData();
     // SendPowerLimit();
 }

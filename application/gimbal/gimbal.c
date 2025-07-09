@@ -122,9 +122,10 @@ static void GimbalStateSet()
         //     gimbal_feedback_data.init_location=gimbal_IMU_data->Pitch;
         //     motor_init=1;
         // }
-        MI_motor_LocationControl(pitch_motor,gimbal_cmd_recv.pitch,pitch_motor->motor_controller.angle_PID.Kp,pitch_motor->motor_controller.angle_PID.Kd);
-        MI_motor_TorqueControl(pitch_motor,pitch_motor->motor_controller.angle_PID.Output)
         MiMotorSetRef(pitch_motor,gimbal_cmd_recv.pitch);
+
+        MI_motor_LocationControl(pitch_motor,gimbal_cmd_recv.pitch,pitch_motor->motor_controller.angle_PID.Kp,pitch_motor->motor_controller.angle_PID.Kd);
+        // MI_motor_TorqueControl(pitch_motor,pitch_motor->motor_controller.angle_PID.Output)
         break;
     default:
         break;

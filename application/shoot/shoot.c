@@ -59,18 +59,18 @@ void ShootInit()
             .close_loop_type = SPEED_LOOP | CURRENT_LOOP,
         },
         .motor_type = M3508};
-    friction_config.can_init_config.tx_id = 2,
-    friction_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_NORMAL,
-    friction_l = DJIMotorInit(&friction_config);
+    // friction_config.can_init_config.tx_id = 2,
+    // friction_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_NORMAL,
+    // friction_l = DJIMotorInit(&friction_config);
 
-    friction_config.can_init_config.tx_id = 1; // 右摩擦轮
-    friction_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_REVERSE;
-    friction_r = DJIMotorInit(&friction_config);
+    // friction_config.can_init_config.tx_id = 1; // 右摩擦轮
+    // friction_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_REVERSE;
+    // friction_r = DJIMotorInit(&friction_config);
 
     // 拨盘电机
     Motor_Init_Config_s loader_config = {
         .can_init_config = {
-            .can_handle = &hcan2,
+            .can_handle = &hcan1,
         },
         .controller_param_init_config = {
             .speed_PID = {
@@ -116,14 +116,14 @@ static void ShootStateSet()
 {
     if (shoot_cmd_recv.shoot_mode == SHOOT_OFF)
     {
-        DJIMotorStop(friction_l);
-        DJIMotorStop(friction_r);
+        // DJIMotorStop(friction_l);
+        // DJIMotorStop(friction_r);
         DJIMotorStop(loader);
     }
     else // 恢复运行
     {
-        DJIMotorEnable(friction_l);
-        DJIMotorEnable(friction_r);
+        // DJIMotorEnable(friction_l);
+        // DJIMotorEnable(friction_r);
         DJIMotorEnable(loader);
     }
 }
@@ -194,7 +194,7 @@ void ShootTask()
 
     ShootStateSet();
     ShootRateSet();
-    ShootSpeedSet();
+    // ShootSpeedSet();
     
     //给发布中心电机实际情况，从而调节拨盘电机的模式
     SendShootData();

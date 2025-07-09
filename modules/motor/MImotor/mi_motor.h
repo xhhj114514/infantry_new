@@ -106,5 +106,5 @@ void MIMotorInstancepeedControl(MIMotorInstance* motor, float speed, float kd);
 void MiMotorControl();
 void MIMotorSetPid(MIMotorInstance* motor, float location_kp,float limit_speed,float speed_kp,float speed_ki);
 void MiMotorSetRef(MIMotorInstance* motor,float location_ref);
-
+float CalMiMotorTorque();
 #endif
