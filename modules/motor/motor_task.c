@@ -8,7 +8,7 @@ void MotorControlTask()
     if(cnt%5==0) //200hz
     DJIMotorControl();
     if(cnt%10==0) //100hz
-    MiMotorControl();
+    //MiMotorControl();
 
     ServeoMotorControl();
 }

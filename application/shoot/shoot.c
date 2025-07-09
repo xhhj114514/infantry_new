@@ -55,16 +55,16 @@ void ShootInit()
         .motor_type = M3508};
     friction_config.can_init_config.tx_id = 2,
     friction_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_NORMAL,
-    friction_l = DJIMotorInit(&friction_config);
+    // friction_l = DJIMotorInit(&friction_config);
 
     friction_config.can_init_config.tx_id = 1; // 右摩擦轮
     friction_config.controller_setting_init_config.motor_reverse_flag = MOTOR_DIRECTION_REVERSE;
-    friction_r = DJIMotorInit(&friction_config);
+    // friction_r = DJIMotorInit(&friction_config);
 
     // 拨盘电机
     Motor_Init_Config_s loader_config = {
         .can_init_config = {
-            .can_handle = &hcan2,
+            .can_handle = &hcan1,
         },
         .controller_param_init_config = {
             .speed_PID = {
