@@ -41,7 +41,10 @@
         "controller.h": "c",
         "mi_motor.h": "c",
         "can.h": "c",
-        "stdint.h": "c"
+        "stdint.h": "c",
+        "crc16.h": "c",
+        "crc8.h": "c",
+        "stdio.h": "c"
     },
     "C_Cpp.errorSquiggles": "disabled",
     "cortex-debug.armToolchainPath": "D:\\DEV\\GNU Arm Embedded Toolchain\\gcc-arm-none-eabi-10.3-2021.10\\bin",

@@ -45,9 +45,9 @@ static uint8_t protocol_heade_Check(protocol_rm_struct *pro, uint8_t *rx_buf)
     if (rx_buf[0] == PROTOCOL_CMD_ID)
     {
         pro->header.sof = rx_buf[0]; 
-        //pro->header.data_length = (rx_buf[2] << 8) | rx_buf[1];
-        //pro->header.crc_check = rx_buf[3];
-        //pro->cmd_id = (rx_buf[5] << 8) | rx_buf[4];
+        pro->header.data_length = (rx_buf[2] << 8) | rx_buf[1];
+        pro->header.crc_check = rx_buf[3];
+        pro->cmd_id = (rx_buf[5] << 8) | rx_buf[4];
         return 1;
     }
     return 0;
@@ -73,28 +73,28 @@ void get_protocol_send_Vision_data(uint16_t send_id,        // 信号id
     /*数据段*/
     tx_buf[1] =tx_data->Vision.detect_color;
     *tx_buf_len = data_len ;
-    //tx_buf[1] = data_len & 0xff;        // 低位在前
-    //tx_buf[2] = (data_len >> 8) & 0xff; // 低位在前
-    //tx_buf[3] = crc_8(&tx_buf[0], 3);   // 获取CRC8校验位
+    tx_buf[1] = data_len & 0xff;        // 低位在前
+    tx_buf[2] = (data_len >> 8) & 0xff; // 低位在前
+    tx_buf[3] = crc_8(&tx_buf[0], 3);   // 获取CRC8校验位
 
     /*数据的信号id*/
-    //tx_buf[4] = send_id & 0xff;
-    //tx_buf[5] = (send_id >> 8) & 0xff;
+    tx_buf[4] = send_id & 0xff;
+    tx_buf[5] = (send_id >> 8) & 0xff;
 
     /*建立16位寄存器*/
-    //tx_buf[6] = flags_register & 0xff;
-    //tx_buf[7] = (flags_register >> 8) & 0xff;
+    tx_buf[6] = flags_register & 0xff;
+    tx_buf[7] = (flags_register >> 8) & 0xff;
 
     /*float数据段*/
-    //for (int i = 0; i < 4 * float_length; i++)
-    //{
-    //    tx_buf[i + 8] = ((uint8_t *)(&tx_data[i / 4]))[i % 4];
-    //}
+    for (int i = 0; i < 4 * float_length; i++)
+    {
+        tx_buf[i + 8] = ((uint8_t *)(&tx_data[i / 4]))[i % 4];
+    }
 
     /*整包校验*/
-    //crc16 = crc_16(&tx_buf[0], data_len + 6);
-    //tx_buf[data_len + 6] = crc16 & 0xff;
-    //tx_buf[data_len + 7] = (crc16 >> 8) & 0xff;
+    crc16 = crc_16(&tx_buf[0], data_len + 6);
+    tx_buf[data_len + 6] = crc16 & 0xff;
+    tx_buf[data_len + 7] = (crc16 >> 8) & 0xff;
 
 }
 
@@ -113,13 +113,14 @@ void get_protocol_info_vision(uint8_t *rx_buf,
     {
         date_length = OFFSET_BYTE + pro.header.data_length;
         //if (CRC16_Check_Sum(rx_buf, date_length)) {
-            *flags_register = (rx_buf[7] << 8) | rx_buf[6];
+            // *flags_register = (rx_buf[7] << 8) | rx_buf[6];
 
             // 将接收到的数据复制到Minipc_Recv_s结构体中
             recv_data->Vision.header = rx_buf[0];
             memcpy(&recv_data->Vision.yaw, &rx_buf[1], sizeof(float));
             memcpy(&recv_data->Vision.pitch, &rx_buf[5], sizeof(float));
-            memcpy(&recv_data->Vision.deep, &rx_buf[9], sizeof(float));
-            recv_data->Vision.checksum = (rx_buf[date_length - 2] << 8) | rx_buf[date_length - 1];
+            memcpy(&recv_data->Vision.deep, &rx_buf[9], sizeof(uint8_t));
+            memcpy(&recv_data->Vision.match, &rx_buf[10], sizeof(int32_t));
+            recv_data->Vision.checksum = (rx_buf[14] << 8) | rx_buf[15];
     }
 }

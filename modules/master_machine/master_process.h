@@ -2,10 +2,12 @@
 #define MASTER_PROCESS_H
 
 #include "bsp_usart.h"
+#include "bsp_dwt.h"
 #include "seasky_protocol.h"
 
 #define Minipc_Recv_sIZE 18u // 当前为固定值,36字节
 #define Minipc_Send_sIZE 36u
+
 
 #pragma pack(1)
 typedef enum
@@ -44,10 +46,12 @@ typedef struct
 		uint8_t header;  // 帧头，固定为0x5A
 		float yaw;       // 需要云台转动的相对 yaw 角
 		float pitch;     // 需要云台转动的相对 pitch 角
-		float deep;     // 物体距离
+		uint8_t deep;     // 物体距离(shoot)
+		int32_t match;  // 上位机时间
 		uint16_t checksum; // 校验和
 	}Vision;
-
+	float Time;
+	float TimeLast;
 } __attribute__((packed)) Minipc_Recv_s;
 
 typedef enum
@@ -72,6 +76,7 @@ typedef struct
 		float roll;
 		float pitch;
 		float yaw;
+		// int32_t match;  // 上位机时间
 		uint16_t checksum; // 校验和
 	}Vision;
 
@@ -117,6 +122,6 @@ void get_protocol_info_vision(uint8_t *rx_buf,
                            uint16_t *flags_register, 
                            Minipc_Recv_s *recv_data);
 
-
+						   void VisionSetAltitude(uint8_t color);
 
 #endif // !MASTER_PROCESS_H
