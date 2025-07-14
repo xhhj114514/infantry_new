@@ -133,7 +133,7 @@ static void VisionJudge()
     // {
     //     gimbal_cmd_send.last_deep= minipc_recv_data->Vision.deep;
     // }
-    if(minipc_recv_data->Time - minipc_recv_data->TimeLast>2.0)
+    if(minipc_recv_data->Time - minipc_recv_data->TimeLast<Delta)
     {
         DataLebel.cmd_error_flag = 1;
     }
@@ -535,7 +535,7 @@ void RobotCMDTask()
     // PubPushMessage(chassis_cmd_pub, (void *)&chassis_cmd_send);
     PubPushMessage(shoot_cmd_pub, (void *)&shoot_cmd_send);
     // PubPushMessage(gimbal_cmd_pub, (void *)&gimbal_cmd_send);
-    VisionSetAltitude(0);
+    
     SendMinipcData(&minipc_send_data);
     // SendToUIData();
 

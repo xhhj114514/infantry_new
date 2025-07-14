@@ -67,34 +67,38 @@ void get_protocol_send_Vision_data(uint16_t send_id,        // 信号id
     static uint16_t crc16;
     static uint16_t data_len;
 
-    data_len =  2;
+    data_len =  20;
     /*帧头部分*/
     tx_buf[0] = SEND_VISION_ID;
     /*数据段*/
     tx_buf[1] =tx_data->Vision.detect_color;
-    *tx_buf_len = data_len ;
-    tx_buf[1] = data_len & 0xff;        // 低位在前
-    tx_buf[2] = (data_len >> 8) & 0xff; // 低位在前
-    tx_buf[3] = crc_8(&tx_buf[0], 3);   // 获取CRC8校验位
+    memcpy(&tx_buf[2], &tx_data->Vision.roll, sizeof(float));
+    memcpy(&tx_buf[6], &tx_data->Vision.pitch, sizeof(float));
+    memcpy(&tx_buf[10], &tx_data->Vision.yaw, sizeof(float));  
+    memcpy(&tx_buf[14], &tx_data->Vision.match, sizeof(int32_t));
+    // *tx_buf_len = data_len ;
+    // tx_buf[1] = data_len & 0xff;        // 低位在前
+    // tx_buf[2] = (data_len >> 8) & 0xff; // 低位在前
+    // tx_buf[3] = crc_8(&tx_buf[0], 3);   // 获取CRC8校验位
 
-    /*数据的信号id*/
-    tx_buf[4] = send_id & 0xff;
-    tx_buf[5] = (send_id >> 8) & 0xff;
+    // /*数据的信号id*/
+    // tx_buf[4] = send_id & 0xff;
+    // tx_buf[5] = (send_id >> 8) & 0xff;
 
-    /*建立16位寄存器*/
-    tx_buf[6] = flags_register & 0xff;
-    tx_buf[7] = (flags_register >> 8) & 0xff;
+    // /*建立16位寄存器*/
+    // tx_buf[6] = flags_register & 0xff;
+    // tx_buf[7] = (flags_register >> 8) & 0xff;
 
-    /*float数据段*/
-    for (int i = 0; i < 4 * float_length; i++)
-    {
-        tx_buf[i + 8] = ((uint8_t *)(&tx_data[i / 4]))[i % 4];
-    }
+    // /*float数据段*/
+    // for (int i = 0; i < 4 * float_length; i++)
+    // {
+    //     tx_buf[i + 8] = ((uint8_t *)(&tx_data[i / 4]))[i % 4];
+    // }
 
-    /*整包校验*/
-    crc16 = crc_16(&tx_buf[0], data_len + 6);
-    tx_buf[data_len + 6] = crc16 & 0xff;
-    tx_buf[data_len + 7] = (crc16 >> 8) & 0xff;
+    // /*整包校验*/
+    // crc16 = crc_16(&tx_buf[0], data_len + 6);
+    // tx_buf[data_len + 6] = crc16 & 0xff;
+    // tx_buf[data_len + 7] = (crc16 >> 8) & 0xff;
 
 }
 

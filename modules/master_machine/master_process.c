@@ -15,10 +15,11 @@ void VisionSetFlag(uint8_t color)
 
 void VisionSetAltitude(uint8_t color)
 {
+    minipc_send_data.Vision.detect_color = COLOR_BLUE;
     minipc_send_data.Vision.pitch = QEKF_INS.Pitch;
     minipc_send_data.Vision.roll = QEKF_INS.Roll;
     minipc_send_data.Vision.yaw = QEKF_INS.Yaw;
-    // minipc_send_data.Vision.match = minipc_recv_data.Vision.match;
+    minipc_send_data.Vision.match = minipc_recv_data.Vision.match;
     
 }
 
@@ -85,7 +86,7 @@ Minipc_Recv_s *minipcInit(UART_HandleTypeDef *_handle)
 void SendMinipcData()
 {
     minipc_recv_data.TimeLast = minipc_recv_data.Time;
-    minipc_recv_data.Time = DWT_GetTimeline_s();
+    minipc_recv_data.Time = minipc_recv_data.Vision.match;
 
     // buff和txlen必须为static,才能保证在函数退出后不被释放,使得DMA正确完成发送
     // 析构后的陷阱需要特别注意!
@@ -97,7 +98,7 @@ void SendMinipcData()
     // 将数据转化为seasky协议的数据包
     get_protocol_send_Vision_data(0x02, flag_register, &minipc_send_data, 1, send_buff, &tx_len);
     VisionSetAltitude(0);
-    USARTSend(minipc_usart_instance, send_buff, tx_len, USART_TRANSFER_DMA); // 和视觉通信使用IT,防止和接收使用的DMA冲突
+    USARTSend(minipc_usart_instance, send_buff, Minipc_Send_sIZE, USART_TRANSFER_DMA); // 和视觉通信使用IT,防止和接收使用的DMA冲突
     // 此处为HAL设计的缺陷,DMASTOP会停止发送和接收,导致再也无法进入接收中断.
     // 也可在发送完成中断中重新启动DMA接收,但较为复杂.因此,此处使用IT发送.
     // 若使用了daemon,则也可以使用DMA发送.

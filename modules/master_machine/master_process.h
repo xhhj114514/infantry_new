@@ -6,7 +6,7 @@
 #include "seasky_protocol.h"
 
 #define Minipc_Recv_sIZE 18u // 当前为固定值,36字节
-#define Minipc_Send_sIZE 36u
+#define Minipc_Send_sIZE 20u // 当前为固定值,36字节
 
 
 #pragma pack(1)
@@ -76,7 +76,7 @@ typedef struct
 		float roll;
 		float pitch;
 		float yaw;
-		// int32_t match;  // 上位机时间
+		int32_t match;  // 上位机时间
 		uint16_t checksum; // 校验和
 	}Vision;
 
