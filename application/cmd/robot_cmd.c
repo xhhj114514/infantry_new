@@ -133,12 +133,9 @@ static void VisionJudge()
     // {
     //     gimbal_cmd_send.last_deep= minipc_recv_data->Vision.deep;
     // }
-    if(minipc_recv_data->Time - minipc_recv_data->TimeLast<Delta)
-    {
-        DataLebel.cmd_error_flag = 1;
-    }
+    DataLebel.cmd_error_flag = minipc_recv_data->FailFlag;//minipc_recv_data->FailFlag;
     //有深度代表有视觉信息
-    else if(DataLebel.cmd_error_flag==0)//代表收到deep(shoot)信息
+    if(DataLebel.cmd_error_flag==0)//代表收到deep(shoot)信息
     {
         if(minipc_recv_data->Vision.deep!=0)
         {
@@ -174,6 +171,12 @@ static void VisionJudge()
         //     DataLebel.aim_flag=0;
         //     AlarmSetStatus(aim_success_buzzer, ALARM_OFF);
         // }
+    }
+    else if(DataLebel.cmd_error_flag == 1)
+    {
+        minipc_recv_data->Vision.deep = 0;
+        minipc_recv_data->Vision.pitch=0;
+        minipc_recv_data->Vision.yaw=0;
     }
      //检测不到装甲板，关蜂鸣器，关火
     else if(minipc_recv_data->Vision.deep==0 && DataLebel.aim_flag==1)       
@@ -482,6 +485,7 @@ static void AnythingStop()
  */
 static void ControlDataDeal()
 {
+    BasicSet();
     if (switch_is_mid(rc_data[TEMP].rc.switch_right)) 
     {
         BasicSet();
@@ -533,6 +537,7 @@ void RobotCMDTask()
     // 设置视觉发送数据,还需增加加速度和角速度数据
     // 推送消息,双板通信,视觉通信等
     // PubPushMessage(chassis_cmd_pub, (void *)&chassis_cmd_send);
+
     PubPushMessage(shoot_cmd_pub, (void *)&shoot_cmd_send);
     // PubPushMessage(gimbal_cmd_pub, (void *)&gimbal_cmd_send);
     

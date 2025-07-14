@@ -50,8 +50,10 @@ typedef struct
 		int32_t match;  // 上位机时间
 		uint16_t checksum; // 校验和
 	}Vision;
-	float Time;
-	float TimeLast;
+	int32_t TCNT;
+	int32_t TCNTLast;
+	int32_t FailCNT;
+	uint8_t FailFlag;
 } __attribute__((packed)) Minipc_Recv_s;
 
 typedef enum
@@ -122,6 +124,7 @@ void get_protocol_info_vision(uint8_t *rx_buf,
                            uint16_t *flags_register, 
                            Minipc_Recv_s *recv_data);
 
-						   void VisionSetAltitude(uint8_t color);
+void VisionSetAltitude(uint8_t color);
+
 
 #endif // !MASTER_PROCESS_H

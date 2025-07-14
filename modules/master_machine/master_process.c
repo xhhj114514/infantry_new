@@ -15,11 +15,11 @@ void VisionSetFlag(uint8_t color)
 
 void VisionSetAltitude(uint8_t color)
 {
-    minipc_send_data.Vision.detect_color = COLOR_BLUE;
+    minipc_send_data.Vision.detect_color = COLOR_RED;
     minipc_send_data.Vision.pitch = QEKF_INS.Pitch;
     minipc_send_data.Vision.roll = QEKF_INS.Roll;
     minipc_send_data.Vision.yaw = QEKF_INS.Yaw;
-    minipc_send_data.Vision.match = minipc_recv_data.Vision.match;
+    minipc_send_data.Vision.match = minipc_recv_data.TCNTLast;
     
 }
 
@@ -85,8 +85,23 @@ Minipc_Recv_s *minipcInit(UART_HandleTypeDef *_handle)
  */
 void SendMinipcData()
 {
-    minipc_recv_data.TimeLast = minipc_recv_data.Time;
-    minipc_recv_data.Time = minipc_recv_data.Vision.match;
+    uint32_t TCNT = 0;
+    TCNT = minipc_recv_data.Vision.match;
+    if(TCNT != minipc_recv_data.TCNTLast  )
+    {
+        minipc_recv_data.TCNTLast = TCNT; // 记录上次接收的时间戳
+        minipc_recv_data.FailCNT = 0;
+        minipc_recv_data.FailFlag = 0;
+    }
+    else if(minipc_recv_data.FailFlag != 1)
+    {
+        minipc_recv_data.FailCNT +=1;
+    }
+   if(minipc_recv_data.FailCNT > 1000)
+   {
+    minipc_recv_data.FailCNT =0;
+    minipc_recv_data.FailFlag =1;
+   }
 
     // buff和txlen必须为static,才能保证在函数退出后不被释放,使得DMA正确完成发送
     // 析构后的陷阱需要特别注意!
