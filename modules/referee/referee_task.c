@@ -64,6 +64,7 @@ void MyUIInit()
     UILineDraw(&UI_shoot_line[3], "sl3", UI_Graph_ADD, 7, UI_Color_Yellow, 2, 900, shoot_line_location[3], 1020, shoot_line_location[3]);
     UILineDraw(&UI_shoot_line[4], "sl4", UI_Graph_ADD, 7, UI_Color_Yellow, 2, 930, shoot_line_location[4], 990, shoot_line_location[4]);
     UIGraphRefresh(&referee_recv_info->referee_id, 5, UI_shoot_line[0], UI_shoot_line[1], UI_shoot_line[2], UI_shoot_line[3], UI_shoot_line[4]);
+    
     UILineDraw(&UI_shoot_line[5], "sl5", UI_Graph_ADD, 7, UI_Color_Yellow, 2, 930, shoot_line_location[5], 990, shoot_line_location[5]);
     UILineDraw(&UI_shoot_line[6], "sl6", UI_Graph_ADD, 7, UI_Color_Yellow, 2, 930, shoot_line_location[6], 990, shoot_line_location[6]);
     UILineDraw(&UI_shoot_line[7], "sl7", UI_Graph_ADD, 7, UI_Color_Yellow, 2, 950, shoot_line_location[7], 970, shoot_line_location[7]);

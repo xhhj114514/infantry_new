@@ -59,7 +59,6 @@ void RobotCMDInit()
     rc_data = RemoteControlInit(&huart3);   // 修改为对应串口,注意如果是自研板dbus协议串口需选用添加了反相器的那个
     minipc_recv_data = minipcInit(&huart1); // 视觉通信串口
     referee_data= UITaskInit(&huart6,&ui_data);
-    //minipc_send_data.Vision.header = 0xA5;
 
     gimbal_cmd_pub = PubRegister("gimbal_cmd", sizeof(Gimbal_Ctrl_Cmd_s));
     gimbal_feed_sub = SubRegister("gimbal_feed", sizeof(Gimbal_Upload_Data_s));
@@ -140,7 +139,7 @@ static void VisionJudge()
         if(minipc_recv_data->Vision.deep!=0)
         {
             DataLebel.aim_flag = 1;
-            DataLebel.fire_flag = 0;
+            DataLebel.fire_flag = minipc_recv_data->Vision.deep;
         }
         // DataLebel.aim_flag=1;
         // //检测到装甲板，开启蜂鸣器
@@ -259,6 +258,11 @@ static void AutoAimSet()
 
 static void ShootRC()
 {
+
+#ifdef USING_VISION_JUDGE_SHOOT
+       shoot_cmd_send.loader_mode = minipc_recv_data->Vision.deep ? LOAD_BURSTFIRE : LOAD_STOP ; // 视觉自瞄时不需要遥控器控制装填
+#endif
+
     if(rc_data->rc.dial>200)
     {
         shoot_cmd_send.loader_mode=LOAD_BURSTFIRE;
@@ -485,8 +489,8 @@ static void AnythingStop()
  */
 static void ControlDataDeal()
 {
-    BasicSet();
-    if (switch_is_mid(rc_data[TEMP].rc.switch_right)) 
+    // BasicSet();For Test
+    if (switch_is_mid(rc_data[TEMP].rc.switch_left)) 
     {
         BasicSet();
         RemoteControlSet();
@@ -526,9 +530,9 @@ static void SendToUIData()
 /* 机器人核心控制任务,200Hz频率运行(必须高于视觉发送频率) */
 void RobotCMDTask()
 {
-    // SubGetMessage(chassis_feed_sub, (void *)&chassis_fetch_data);
-    // SubGetMessage(shoot_feed_sub, &shoot_fetch_data);
-    // SubGetMessage(gimbal_feed_sub, &gimbal_fetch_data);
+    SubGetMessage(chassis_feed_sub, (void *)&chassis_fetch_data);
+    SubGetMessage(shoot_feed_sub, &shoot_fetch_data);
+    SubGetMessage(gimbal_feed_sub, &gimbal_fetch_data);
 
     // 根据gimbal的反馈值计算云台和底盘正方向的夹角,不需要传参,通过static私有变量完成
     CalcOffsetAngle();
@@ -536,12 +540,11 @@ void RobotCMDTask()
 
     // 设置视觉发送数据,还需增加加速度和角速度数据
     // 推送消息,双板通信,视觉通信等
-    // PubPushMessage(chassis_cmd_pub, (void *)&chassis_cmd_send);
-
+    PubPushMessage(chassis_cmd_pub, (void *)&chassis_cmd_send);
     PubPushMessage(shoot_cmd_pub, (void *)&shoot_cmd_send);
-    // PubPushMessage(gimbal_cmd_pub, (void *)&gimbal_cmd_send);
+    PubPushMessage(gimbal_cmd_pub, (void *)&gimbal_cmd_send);
     
     SendMinipcData(&minipc_send_data);
-    // SendToUIData();
+    SendToUIData();
 
 }

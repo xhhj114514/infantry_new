@@ -15,7 +15,7 @@ void VisionSetFlag(uint8_t color)
 
 void VisionSetAltitude(uint8_t color)
 {
-    minipc_send_data.Vision.detect_color = COLOR_RED;
+    minipc_send_data.Vision.detect_color = color;
     minipc_send_data.Vision.pitch = QEKF_INS.Pitch;
     minipc_send_data.Vision.roll = QEKF_INS.Roll;
     minipc_send_data.Vision.yaw = QEKF_INS.Yaw;
@@ -112,7 +112,7 @@ void SendMinipcData()
     flag_register = 30 << 8 | 0b00000001;
     // 将数据转化为seasky协议的数据包
     get_protocol_send_Vision_data(0x02, flag_register, &minipc_send_data, 1, send_buff, &tx_len);
-    VisionSetAltitude(0);
+    VisionSetAltitude(minipc_send_data.Vision.detect_color);
     USARTSend(minipc_usart_instance, send_buff, Minipc_Send_sIZE, USART_TRANSFER_DMA); // 和视觉通信使用IT,防止和接收使用的DMA冲突
     // 此处为HAL设计的缺陷,DMASTOP会停止发送和接收,导致再也无法进入接收中断.
     // 也可在发送完成中断中重新启动DMA接收,但较为复杂.因此,此处使用IT发送.
