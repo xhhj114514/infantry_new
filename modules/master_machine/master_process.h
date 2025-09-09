@@ -46,7 +46,7 @@ typedef struct
 		uint8_t header;  // 帧头，固定为0x5A
 		float yaw;       // 需要云台转动的相对 yaw 角
 		float pitch;     // 需要云台转动的相对 pitch 角
-		uint8_t deep;     // 物体距离(shoot)
+		uint8_t shoot;     // 物体距离(shoot)
 		int32_t match;  // 上位机时间
 		uint16_t checksum; // 校验和
 	}Vision;

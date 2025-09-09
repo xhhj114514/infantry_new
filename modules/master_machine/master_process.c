@@ -7,6 +7,7 @@
 static Minipc_Recv_s minipc_recv_data;
 static Minipc_Send_s minipc_send_data;
 static DaemonInstance *minipc_daemon_instance;
+#define Minipc_Failed_Count 1000
 
 void VisionSetFlag(uint8_t color)
 {
@@ -97,7 +98,7 @@ void SendMinipcData()
     {
         minipc_recv_data.FailCNT +=1;
     }
-   if(minipc_recv_data.FailCNT > 1000)
+   if(minipc_recv_data.FailCNT > Minipc_Failed_Count)
    {
     minipc_recv_data.FailCNT =0;
     minipc_recv_data.FailFlag =1;

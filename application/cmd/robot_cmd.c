@@ -21,28 +21,46 @@
 #define PTICH_HORIZON_ANGLE (PITCH_HORIZON_ECD * ECD_ANGLE_COEF_DJI) // pitch水平时电机的角度,0-360
 
 /* cmd应用包含的模块实例指针和交互信息存储*/
+/**
+ * 模块实例
+ * IPC通信组件
+ */
+
+
+//RC & MINIPC
+static RC_ctrl_t *rc_data;              // 遥控器数据,初始化时返回
+static Minipc_Recv_s *minipc_recv_data; // 视觉接收数据指针,初始化时返回
+static Minipc_Send_s minipc_send_data;  // 视觉发送数据
+
+//BUZZER
+static  BuzzzerInstance *aim_success_buzzer;
+
+
+
+/*-------------IPC------------*/
+//CHASSIS
 static Publisher_t *chassis_cmd_pub;   // 底盘控制消息发布者
 static Subscriber_t *chassis_feed_sub; // 底盘反馈信息订阅者
 
 static Chassis_Ctrl_Cmd_s chassis_cmd_send;      // 发送给底盘应用的信息,包括控制信息和UI绘制相关
 static Chassis_Upload_Data_s chassis_fetch_data; // 从底盘应用接收的反馈信息信息,底盘功率枪口热量与底盘运动状态等
 
-static RC_ctrl_t *rc_data;              // 遥控器数据,初始化时返回
-static Minipc_Recv_s *minipc_recv_data; // 视觉接收数据指针,初始化时返回
-static Minipc_Send_s minipc_send_data;  // 视觉发送数据
-
+//GIMBAL
 static Publisher_t *gimbal_cmd_pub;            // 云台控制消息发布者
 static Subscriber_t *gimbal_feed_sub;          // 云台反馈信息订阅者
 static Gimbal_Ctrl_Cmd_s gimbal_cmd_send;      // 传递给云台的控制信息
 static Gimbal_Upload_Data_s gimbal_fetch_data; // 从云台获取的反馈信息
 
+//SHOOT
 static Publisher_t *shoot_cmd_pub;           // 发射控制消息发布者
 static Subscriber_t *shoot_feed_sub;         // 发射反馈信息订阅者
 static Shoot_Ctrl_Cmd_s shoot_cmd_send;      // 传递给发射的控制信息
 static Shoot_Upload_Data_s shoot_fetch_data; // 从发射获取的反馈信息
 
+
+//GLOBAL VAR
 static Robot_Status_e robot_state; // 机器人整体工作状态
-static  BuzzzerInstance *aim_success_buzzer;
+
 static DataLebel_t DataLebel;
 
 static uint8_t gimbal_location_init=0;
@@ -130,7 +148,7 @@ static void VisionJudge()
     //有深度代表有视觉信息
     if(DataLebel.cmd_error_flag==0)
     {
-        if(minipc_recv_data->Vision.deep!=0)//代表收到deep(shoot)信息
+        if(minipc_recv_data->Vision.shoot!=0)//代表收到deep(shoot)信息
         {
             DataLebel.aim_flag = 1;
             DataLebel.fire_flag =1;//1代表可以开火
@@ -138,12 +156,12 @@ static void VisionJudge()
     }
     else if(DataLebel.cmd_error_flag == 1)
     {
-        minipc_recv_data->Vision.deep = 0;
+        minipc_recv_data->Vision.shoot = 0;
         minipc_recv_data->Vision.pitch=0;
         minipc_recv_data->Vision.yaw=0;
     }
      //检测不到装甲板，关蜂鸣器，关火
-    else if(minipc_recv_data->Vision.deep==0 && DataLebel.aim_flag==1)       
+    else if(minipc_recv_data->Vision.shoot==0 && DataLebel.aim_flag==1)       
     {
         DataLebel.fire_flag=0;
         DataLebel.aim_flag=0;
@@ -490,9 +508,9 @@ static void SendToUIData()
 /* 机器人核心控制任务,200Hz频率运行(必须高于视觉发送频率) */
 void RobotCMDTask()
 {
-    // SubGetMessage(chassis_feed_sub, (void *)&chassis_fetch_data);
-    // SubGetMessage(shoot_feed_sub, &shoot_fetch_data);
-    // SubGetMessage(gimbal_feed_sub, &gimbal_fetch_data);
+    SubGetMessage(chassis_feed_sub, (void *)&chassis_fetch_data);
+    SubGetMessage(shoot_feed_sub, &shoot_fetch_data);
+    SubGetMessage(gimbal_feed_sub, &gimbal_fetch_data);
 
     // 根据gimbal的反馈值计算云台和底盘正方向的夹角,不需要传参,通过static私有变量完成
     CalcOffsetAngle();

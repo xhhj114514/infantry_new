@@ -75,8 +75,8 @@ void GimbalInit()
     // 电机对total_angle闭环,上电时为零,会保持静止,收到遥控器数据再动
     yaw_motor = DJIMotorInit(&yaw_config);
     pitch_motor = MIMotorInit(&pitch_config);
-    //MIMotorModeSwitch(pitch_motor,1);
-    //MIMotorSetPid(pitch_motor,pitch_motor->motor_controller.angle_PID.Kp,4,pitch_motor->motor_controller.speed_PID.Kp,pitch_motor->motor_controller.speed_PID.Ki);
+    MIMotorModeSwitch(pitch_motor,1);
+    MIMotorSetPid(pitch_motor,pitch_motor->motor_controller.angle_PID.Kp,4,pitch_motor->motor_controller.speed_PID.Kp,pitch_motor->motor_controller.speed_PID.Ki);
     MIMotorInstanceetMechPositionToZero(pitch_motor);
 
     gimbal_pub = PubRegister("gimbal_feed", sizeof(Gimbal_Upload_Data_s));
