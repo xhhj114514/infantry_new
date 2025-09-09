@@ -78,7 +78,6 @@ void RobotCMDInit()
     minipc_recv_data = minipcInit(&huart1); // 视觉通信串口
     referee_data= UITaskInit(&huart6,&ui_data);
 
-    
     gimbal_cmd_pub = PubRegister("gimbal_cmd", sizeof(Gimbal_Ctrl_Cmd_s));
     gimbal_feed_sub = SubRegister("gimbal_feed", sizeof(Gimbal_Upload_Data_s));
     shoot_cmd_pub = PubRegister("shoot_cmd", sizeof(Shoot_Ctrl_Cmd_s));
@@ -241,6 +240,11 @@ static void AutoAimSet()
 
 static void ShootRC()
 {
+
+#ifdef USING_VISION_JUDGE_SHOOT
+       shoot_cmd_send.loader_mode = minipc_recv_data->Vision.deep ? LOAD_BURSTFIRE : LOAD_STOP ; // 视觉自瞄时不需要遥控器控制装填
+#endif
+
     if(rc_data->rc.dial>200)
     {
         shoot_cmd_send.loader_mode=LOAD_BURSTFIRE;
@@ -467,8 +471,8 @@ static void AnythingStop()
  */
 static void ControlDataDeal()
 {
-    BasicSet();
-    if (switch_is_mid(rc_data[TEMP].rc.switch_right)) 
+    // BasicSet();For Test
+    if (switch_is_mid(rc_data[TEMP].rc.switch_left)) 
     {
         BasicSet();
         RemoteControlSet();
@@ -518,12 +522,11 @@ void RobotCMDTask()
 
     // 设置视觉发送数据,还需增加加速度和角速度数据
     // 推送消息,双板通信,视觉通信等
-    // PubPushMessage(chassis_cmd_pub, (void *)&chassis_cmd_send);
-
+    PubPushMessage(chassis_cmd_pub, (void *)&chassis_cmd_send);
     PubPushMessage(shoot_cmd_pub, (void *)&shoot_cmd_send);
-    // PubPushMessage(gimbal_cmd_pub, (void *)&gimbal_cmd_send);
+    PubPushMessage(gimbal_cmd_pub, (void *)&gimbal_cmd_send);
     
     SendMinipcData(&minipc_send_data);
-    // SendToUIData();
+    SendToUIData();
 
 }
