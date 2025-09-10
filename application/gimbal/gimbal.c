@@ -29,11 +29,10 @@ void GimbalInit()
             .angle_PID = {
                 .Kp = 30, // 8
                 .Ki = 20,
-                .Kd = 1.2,
+                .Kd = 3,//1.2
                 .DeadBand = 0.1,
                 .Improve = PID_Trapezoid_Intergral | PID_Integral_Limit | PID_Derivative_On_Measurement,
                 .IntegralLimit = 100,
-
                 .MaxOut = 500,
             },
             .speed_PID = {

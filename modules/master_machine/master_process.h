@@ -117,6 +117,6 @@ void get_protocol_info_vision(uint8_t *rx_buf,
                            uint16_t *flags_register, 
                            Minipc_Recv_s *recv_data);
 
-
+						   void VisionSetAltitude();
 
 #endif // !MASTER_PROCESS_H

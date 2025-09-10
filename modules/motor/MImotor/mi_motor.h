@@ -6,7 +6,7 @@
 #include "motor_def.h"
 #include "daemon.h"
 
-#define MI_MOTOR_CNT 12
+#define MI_MOTOR_CNT 2
 
 
 /* Private defines -----------------------------------------------------------*/

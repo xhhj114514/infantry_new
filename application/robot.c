@@ -16,7 +16,6 @@
 #include "shoot.h"
 #include "robot_cmd.h"
 
-
 void RobotInit()
 {  
     // 关闭中断,防止在初始化过程中发生中断
@@ -27,10 +26,10 @@ void RobotInit()
     BSPInit();
     RobotCMDInit();
     GimbalInit();
-    ShootInit();
+    //ShootInit();
 
 
-    ChassisInit();
+   //ChassisInit();
 
     OSTaskInit(); // 创建基础任务
 
@@ -42,6 +41,6 @@ void RobotTask()
 {
     RobotCMDTask();
     GimbalTask();
-    ShootTask();
-    ChassisTask();
+   // ShootTask();
+   // ChassisTask();
 }

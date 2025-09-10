@@ -188,7 +188,7 @@ static void BasicSet()
 
 static void GimbalRC()
 {
-    gimbal_cmd_send.yaw -= 0.0005f * (float)rc_data[TEMP].rc.rocker_right_x;//0
+    gimbal_cmd_send.yaw -= 0.0045f * (float)rc_data[TEMP].rc.rocker_right_x;//0.0005f * (float)rc_data[TEMP].rc.rocker_right_x
     gimbal_cmd_send.pitch -= 0.0001f * (float)rc_data[TEMP].rc.rocker_right_y;
     gimbal_cmd_send.real_pitch= ((gimbal_fetch_data.gimbal_imu_data.Pitch)-gimbal_fetch_data.init_location)/57.39;
 }
@@ -525,6 +525,7 @@ void RobotCMDTask()
     PubPushMessage(chassis_cmd_pub, (void *)&chassis_cmd_send);
     PubPushMessage(shoot_cmd_pub, (void *)&shoot_cmd_send);
     PubPushMessage(gimbal_cmd_pub, (void *)&gimbal_cmd_send);
+    VisionSetAltitude();
     SendMinipcData(&minipc_send_data);
     SendToUIData();
 
