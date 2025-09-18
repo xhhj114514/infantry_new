@@ -89,7 +89,7 @@ typedef struct
     float Last_Dout;
 
     float Ref;
-
+    float FF_Gain;       // 前馈增益
     uint32_t DWT_CNT;
     float dt;
 
@@ -113,6 +113,7 @@ typedef struct // config parameter
     float CoefB;         // ITerm = Err*((A-abs(err)+B)/A)  when B<|err|<A+B
     float Output_LPF_RC; // RC = 1/omegac
     float Derivative_LPF_RC;
+    float FF_Gain;       // 前馈增益
 } PID_Init_Config_s;
 
 /**

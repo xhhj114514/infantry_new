@@ -183,11 +183,11 @@ float PIDCalculate(PIDInstance *pid, float measure, float ref)
 
         pid->Iout += pid->ITerm;                         // 累加积分
         pid->Output = pid->Pout + pid->Iout + pid->Dout; // 计算输出
-
+        
         // 输出滤波
         if (pid->Improve & PID_OutputFilter)
             f_Output_Filter(pid);
-
+        pid->Output += pid->FF_Gain*(pid->Measure - pid->Last_Measure);
         // 输出限幅
         f_Output_Limit(pid);
     }
