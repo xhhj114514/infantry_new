@@ -66,10 +66,12 @@ void GimbalInit()
             .angle_PID={
                 .Kp=10,
                 .Kd=0.35,
+                .FF_Gain = 0.0,
             },
             .speed_PID={
                 .Kp=1,
                 .Ki=0.01,
+                .FF_Gain = 0.0,
             },
         },
     };

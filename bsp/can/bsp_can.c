@@ -26,13 +26,14 @@ static uint8_t idx; // 全局CAN实例索引,每次有新的模块注册会自�
  *
  * @param _instance can instance owned by specific module
  */
-static void CANAddFilter(CANInstance *_instance)
+static void CANAddFilter(CANInstance *_instance, uint8_t __type__)
 {
     CAN_FilterTypeDef can_filter_conf;
-    static uint8_t can1_filter_idx = 0, can2_filter_idx = 14; // 0-13给can1用,14-27给can2用
-
+    static uint8_t can1_filter_idx = 0, can2_filter_idx = 14; // 0-13给can1用,14-27给can2用)
+    
     can_filter_conf.FilterMode = CAN_FILTERMODE_IDLIST;                                                       // 使用id list模式,即只有将rxid添加到过滤器中才会接收到,其他报文会被过滤
-    can_filter_conf.FilterScale = CAN_FILTERSCALE_16BIT;                                                      // 使用16位id模式,即只有低16位有效
+    can_filter_conf.FilterScale = __type__ == 0 ? CAN_FILTERSCALE_16BIT : CAN_FILTERSCALE_32BIT; // 使用16位id模式,即只有低16位有效
+    //can_filter_conf.FilterScale = CAN_FILTERSCALE_16BIT;                                                      // 使用16位id模式,即只有低16位有效
     can_filter_conf.FilterFIFOAssignment = (_instance->tx_id & 1) ? CAN_RX_FIFO0 : CAN_RX_FIFO1;              // 奇数id的模块会被分配到FIFO0,偶数id的模块会被分配到FIFO1
     can_filter_conf.SlaveStartFilterBank = 14;                                                                // 从第14个过滤器开始配置从机过滤器(在STM32的BxCAN控制器中CAN2是CAN1的从机)
     can_filter_conf.FilterIdLow = _instance->rx_id << 5;                                                      // 过滤器寄存器的低16位,因为使用STDID,所以只有低11位有效,高5位要填0
@@ -100,8 +101,15 @@ CANInstance *CANRegister(CAN_Init_Config_s *config)
     instance->rx_id = config->rx_id;
     instance->can_module_callback = config->can_module_callback;
     instance->id = config->id;
-
-    CANAddFilter(instance);         // 添加CAN过滤器规则
+    if(config->can_handle == &hcan1)
+    {
+        CANAddFilter(instance,0);
+    }
+    else if(config->can_handle == &hcan2)
+    {
+        CANAddFilter(instance,1);
+    }
+    //CANAddFilter(instance);         // 添加CAN过滤器规则
     can_instance[idx++] = instance; // 将实例保存到can_instance中
 
     return instance; // 返回can实例指针
