@@ -6,7 +6,7 @@
 #include "motor_def.h"
 #include "daemon.h"
 
-#define MI_MOTOR_CNT 2
+#define MI_MOTOR_CNT 12
 
 
 /* Private defines -----------------------------------------------------------*/
@@ -73,6 +73,13 @@ typedef enum
     RUN_MODE   = 2 //Motor模式[运行]
 } motor_mode_state_e;//电机模式状态
 
+typedef struct
+{
+    float angle;//(rad)
+    float speed;//(rad/s)
+    float torque;//(N*m)
+    float temperature;//(℃)
+} MI_Motor_Measure_s;     //大疆电机测量值
 
 
 typedef struct
@@ -81,9 +88,9 @@ typedef struct
     motor_state_e motor_state;
     motor_mode_state_e  motor_mode_state;
     uint8_t motor_id;
-    RxCAN_info_type_2_s RxCAN_info;
     Motor_Control_Setting_s motor_settings; // 电机设置
     Motor_Controller_s motor_controller;
+    MI_Motor_Measure_s measure;
 }MIMotorInstance;
 
 /**********************Functions**************************/
@@ -92,9 +99,9 @@ MIMotorInstance *MIMotorInit(Motor_Init_Config_s *config);
 
 
 void MI_motor_GetID(MIMotorInstance* motor);
-void DecodeMiMotor(CANInstance *_instance);
 void MIMotorEnable(MIMotorInstance *motor);
-void MIMotorInstancetop(MIMotorInstance *motor);
+void MIMotorInstancestop(MIMotorInstance *motor);    //小米电机停止
+
 void MIMotorInstanceetMechPositionToZero(MIMotorInstance *motor);
 void MI_motor_ChangeID(MIMotorInstance* motor,uint8_t Now_ID,uint8_t Target_ID);
 void MI_motor_ReadParam(MIMotorInstance* motor, uint16_t index);
@@ -106,5 +113,5 @@ void MIMotorInstancepeedControl(MIMotorInstance* motor, float speed, float kd);
 void MiMotorControl();
 void MIMotorSetPid(MIMotorInstance* motor, float location_kp,float limit_speed,float speed_kp,float speed_ki);
 void MiMotorSetRef(MIMotorInstance* motor,float location_ref);
-
+float CalMiMotorTorque();
 #endif

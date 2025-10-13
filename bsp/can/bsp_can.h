@@ -5,7 +5,7 @@
 #include "can.h"
 
 // 最多能够支持的CAN设备数
-#define CAN_MX_REGISTER_CNT 16     // 这个数量取决于CAN总线的负载
+#define CAN_MX_REGISTER_CNT 16     // 这个数量取决于CAN总线的负载       
 #define MX_CAN_FILTER_CNT (2 * 14) // 最多可以使用的CAN过滤器数量,目前远不会用到这么多
 #define DEVICE_CAN_CNT 2           // 根据板子设定,F407IG有CAN1,CAN2,因此为2;F334只有一个,则设为1
 // 如果只有1个CAN,还需要把bsp_can.c中所有的hcan2变量改为hcan1(别担心,主要是总线和FIFO的负载均衡,不影响功能)
@@ -70,7 +70,7 @@ typedef struct _
     CAN_HandleTypeDef *can_handle; // can句柄
     CAN_TxHeaderTypeDef txconf;    // CAN报文发送配置
     uint32_t tx_id;                // 发送id
-    uint32_t tx_mailbox;           // CAN消息填入的邮箱号
+    uint32_t tx_mailbox;           // CAN消息填入的“邮箱号”
     uint8_t tx_buff[8];            // 发送缓存,发送消息长度可以通过CANSetDLC()设定,最大为8
     uint8_t rx_buff[8];            // 接收缓存,最大消息长度为8
     uint32_t rx_id;                // 接收id
@@ -82,21 +82,25 @@ typedef struct _
     EXT_ID_t EXT_ID;
     
     RxCAN_info_type_2_s RxCAN_info;
-}CANInstance;
+}CANInstance;      //can的实例
 #pragma pack()
+
 
 /* CAN实例初始化结构体,将此结构体指针传入注册函数 */
 typedef struct
 {
     CAN_HandleTypeDef *can_handle;              // can句柄
+
     uint32_t tx_id;                             // 发送id
     uint32_t rx_id;                             // 接收id
+    
     void (*can_module_callback)(CANInstance *); // 处理接收数据的回调函数
     void *id;                                   // 拥有can实例的模块地址,用于区分不同的模块(如果有需要的话),如果不需要可以不传入
     uint8_t ext_flag;
     EXT_ID_t EXT_ID;
 
-} CAN_Init_Config_s;
+} CAN_Init_Config_s;        //can初始化设置,can句柄，id
+
 
 
 
@@ -107,7 +111,7 @@ typedef struct
  * @param config init config
  * @return CANInstance* can instance owned by module
  */
-CANInstance *CANRegister(CAN_Init_Config_s *config);
+CANInstance *CANRegister(CAN_Init_Config_s *config);           //注册can实例
 
 /**
  * @brief 修改CAN发送报文的数据帧长度;注意最大长度为8,在没有进行修改的时候,默认长度为8
@@ -115,7 +119,7 @@ CANInstance *CANRegister(CAN_Init_Config_s *config);
  * @param _instance 要修改长度的can实例
  * @param length    设定长度
  */
-void CANSetDLC(CANInstance *_instance, uint8_t length);
+void CANSetDLC(CANInstance *_instance, uint8_t length);            //修改can实例长度
 
 /**
  * @brief transmit mesg through CAN device,通过can实例发送消息
@@ -126,6 +130,6 @@ void CANSetDLC(CANInstance *_instance, uint8_t length);
  * @param timeout 超时时间,单位为ms;后续改为us,获得更精确的控制
  * @param _instance* can instance owned by module
  */
-uint8_t CANTransmit(CANInstance *_instance,float timeout);
+uint8_t CANTransmit(CANInstance *_instance,float timeout);       //can发送函数
 
 #endif

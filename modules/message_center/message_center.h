@@ -2,7 +2,7 @@
 #define PUBSUB_H
 
 #include "stdint.h"
-
+#include "cmsis_os.h"
 #define MAX_TOPIC_NAME_LEN 32 // 最大的话题名长度,每个话题都有字符串来命名
 #define MAX_TOPIC_COUNT 12    // 最多支持的话题数量
 #define QUEUE_SIZE 1
@@ -17,7 +17,9 @@ typedef struct mqt
     uint8_t temp_size; // 当前队列长度
 
     /* 指向下一个订阅了相同的话题的订阅者的指针 */
-    struct mqt *next_subs_queue; // 使得发布者可以通过链表访问所有订阅了相同话题的订阅者
+    struct mqt *next_subs_queue; // 这里自引用的原因是为了能将把所有订阅者连接成链表，按顺序给每个订阅者发送消息
+    osMutexId mutex;  // 添加互斥锁
+
 } Subscriber_t;
 
 /**
@@ -34,6 +36,8 @@ typedef struct ent
     /* 指向下一个Publisher的指针 */
     struct ent *next_topic_node;
     uint8_t pub_registered_flag; // 用于标记该发布者是否已经注册
+    osMutexId mutex;  // 添加互斥锁
+
 } Publisher_t;
 
 /**

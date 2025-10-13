@@ -51,6 +51,24 @@ static float RangeRestrict(float x, float x_min, float x_max)
 }
 
 /**
+  * @brief          小米电机反馈帧解码（通信类型2）
+  * @param[in]      Rx_can_info 接受到的电机数据结构体
+  * @param[in]      rx_data[8] CAN线接收到的数据
+  * @note           将接收到的CAN线数据解码到电机数据结构体中
+  * @retval         none
+  */
+static void DecodeMiMotor(CANInstance *_instance)
+{
+    uint8_t *rxbuff = _instance->rx_buff;
+    MIMotorInstance *motor = (MIMotorInstance *)_instance->id;
+    MI_Motor_Measure_s *measure=&motor->measure;
+    measure->angle = ((float)(rxbuff[0] << 8 | rxbuff[1])-32767.5)/32767.5*4*3.1415926f;
+    measure->speed = ((float)(rxbuff[2] << 8 | rxbuff[3])-32767.5)/32767.5*30.0f;
+    measure->torque = ((float)(rxbuff[4] << 8 | rxbuff[5])-32767.5)/32767.5*12.0f;
+    measure->temperature = (float)(rxbuff[6] << 8 | rxbuff[7])/10.0f;
+}
+
+/**
   * @brief          小米电机初始化
   * @param[out]     motor 电机结构体
   * @param[in]      phcan can总线句柄
@@ -60,9 +78,16 @@ MIMotorInstance *MIMotorInit(Motor_Init_Config_s *config)
 {
     MIMotorInstance *motor = (MIMotorInstance *)malloc(sizeof(MIMotorInstance));
     memset(motor, 0, sizeof(MIMotorInstance));
-    PIDInit(&motor->motor_controller.angle_PID, &config->controller_param_init_config.angle_PID);
+    motor->motor_settings = config->controller_setting_init_config; // 正反转,闭环类型等
 
-    config->can_init_config.ext_flag=1;
+    PIDInit(&motor->motor_controller.angle_PID, &config->controller_param_init_config.angle_PID);
+    PIDInit(&motor->motor_controller.speed_PID, &config->controller_param_init_config.speed_PID);
+
+    motor->motor_controller.other_angle_feedback_ptr = config->controller_param_init_config.other_angle_feedback_ptr;
+    motor->motor_controller.other_speed_feedback_ptr = config->controller_param_init_config.other_speed_feedback_ptr;
+    motor->motor_controller.current_feedforward_ptr = config->controller_param_init_config.current_feedforward_ptr;
+    motor->motor_controller.speed_feedforward_ptr = config->controller_param_init_config.speed_feedforward_ptr;
+    motor->motor_can_instace->ext_flag=config->can_init_config.ext_flag;
     config->can_init_config.can_module_callback = DecodeMiMotor; 
     config->can_init_config.id = motor;                       
     motor->motor_can_instace = CANRegister(&config->can_init_config);
@@ -121,31 +146,7 @@ void MI_motor_Control(MIMotorInstance* motor, float torque, float MechPosition ,
     mi_sender_assignment[0].tx_buff[7]=FloatToUint(kd,KD_MIN,KD_MAX,16);
 }
 
-/**
-  * @brief          小米电机反馈帧解码（通信类型2）
-  * @param[in]      Rx_can_info 接受到的电机数据结构体
-  * @param[in]      rx_data[8] CAN线接收到的数据
-  * @note           将接收到的CAN线数据解码到电机数据结构体中
-  * @retval         none
-  */
-void DecodeMiMotor(CANInstance *_instance)
-{
-    uint8_t *rxbuff = _instance->rx_buff;
-    MIMotorInstance *motor = (MIMotorInstance *)_instance->id;
 
-    uint16_t decode_temp_mi;//小米电机反馈数据解码缓冲
-    decode_temp_mi = (rxbuff[0] << 8 | rxbuff[1]);
-    _instance->RxCAN_info.angle = ((float)decode_temp_mi-32767.5)/32767.5*4*3.1415926f;;
-
-    decode_temp_mi = (rxbuff[2] << 8 | rxbuff[3]);
-     _instance->RxCAN_info.speed = ((float)decode_temp_mi-32767.5)/32767.5*30.0f;
-
-    decode_temp_mi = (rxbuff[4] << 8 | rxbuff[5]);
-     _instance->RxCAN_info.torque = ((float)decode_temp_mi-32767.5)/32767.5*12.0f;
-
-    decode_temp_mi = (rxbuff[6] << 8 | rxbuff[7]);
-     _instance->RxCAN_info.temperature = (float)decode_temp_mi/10.0f;
-}
 
 
 /**
@@ -178,7 +179,7 @@ void MIMotorEnable(MIMotorInstance* motor)
   * @param[in]      motor 电机结构体
   * @retval         none
   */
-void MIMotorInstancetop(MIMotorInstance* motor)
+void MIMotorInstancestop(MIMotorInstance* motor)
 {
     motor->motor_can_instace->EXT_ID.mode = 4;
     motor->motor_can_instace->EXT_ID.motor_id =127;
@@ -242,6 +243,7 @@ void MI_motor_ChangeID(MIMotorInstance* motor,uint8_t Now_ID,uint8_t Target_ID)
         motor->motor_can_instace->tx_buff[i]=0;
     }
 }
+
 
 
 /**
@@ -323,6 +325,8 @@ void MIMotorSetPid(MIMotorInstance* motor, float location_kp,float limit_speed,f
 
 void MiMotorSetRef(MIMotorInstance* motor,float location_ref)
 {
+      // motor->motor_controller.pid_ref = location_ref;
+
     MI_motor_WritePram(motor,0x7016,location_ref);
 }
 /*-------------------- 封装的一些控制函数 --------------------*/
@@ -339,7 +343,7 @@ void MI_motor_TorqueControl(MIMotorInstance* motor, float torque)
 }
 
 /**
-  * @brief          小米电机位置模式控制指令
+  * @brief          小米电机“位置”模式控制指令
   * @param[in]      motor 电机结构体
   * @param[in]      location 控制位置 rad
   * @param[in]      kp 响应速度(到达位置快慢)，一般取1-10
@@ -366,4 +370,53 @@ void MIMotorInstancepeedControl(MIMotorInstance* motor, float speed, float kd)
 void MiMotorControl()
 {
     CANTransmit(&mi_sender_assignment[0], 1);
+}
+
+float CalMiMotorTorque()
+{
+    MIMotorInstance *motor;
+    Motor_Control_Setting_s *motor_setting; // 电机控制参数
+    Motor_Controller_s *motor_controller;   // 电机控制器
+    float pid_measure, pid_ref,set;             // 电机PID测量值和设定值
+
+    motor = mi_motor_instance[0];
+    motor_setting = &motor->motor_settings;
+    motor_controller = &motor->motor_controller;
+    pid_ref = motor_controller->pid_ref; // 保存设定值,防止motor_controller->pid_ref在计算过程中被修改
+       
+    if (motor_setting->motor_reverse_flag == MOTOR_DIRECTION_REVERSE)
+        pid_ref *= -1; // 设置反转
+
+        // pid_ref会顺次通过被启用的闭环充当数据的载体
+        // 计算位置环,只有启用位置环且外层闭环为位置时会计算速度环输出
+        if ((motor_setting->close_loop_type & ANGLE_LOOP) && motor_setting->outer_loop_type == ANGLE_LOOP)
+        {
+            if (motor_setting->angle_feedback_source == OTHER_FEED)
+            pid_measure = *motor_controller->other_angle_feedback_ptr;
+            // 更新pid_ref进入下一个环
+            pid_ref = PIDCalculate(&motor_controller->angle_PID, pid_measure, pid_ref);
+        }
+
+        // 计算速度环,(外层闭环为速度或位置)且(启用速度环)时会计算速度环
+        if ((motor_setting->close_loop_type & SPEED_LOOP) && (motor_setting->outer_loop_type & (ANGLE_LOOP | SPEED_LOOP)))
+        {
+            if (motor_setting->feedforward_flag & SPEED_FEEDFORWARD)
+                pid_ref += *motor_controller->speed_feedforward_ptr;
+
+            if (motor_setting->speed_feedback_source == OTHER_FEED)
+                pid_measure = *motor_controller->other_speed_feedback_ptr;
+            // 更新pid_ref进入下一个环
+            pid_ref = PIDCalculate(&motor_controller->speed_PID, pid_measure, pid_ref);
+        }
+
+        // 计算电流环,目前只要启用了电流环就计算,不管外层闭环是什么,并且电流只有电机自身传感器的反馈
+        if (motor_setting->feedforward_flag & CURRENT_FEEDFORWARD)
+            pid_ref += *motor_controller->current_feedforward_ptr;
+
+        if (motor_setting->feedback_reverse_flag == FEEDBACK_DIRECTION_REVERSE)
+            pid_ref *= -1;
+
+        // 获取最终输出
+        set = (float)pid_ref;
+        return set;
 }

@@ -10,5 +10,4 @@ void MotorControlTask()
     if(cnt%10==0) //100hz
     MiMotorControl();
 
-    ServeoMotorControl();
 }

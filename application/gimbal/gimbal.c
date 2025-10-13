@@ -61,6 +61,7 @@ void GimbalInit()
     Motor_Init_Config_s pitch_config = {
         .can_init_config = {
             .can_handle = &hcan2,
+            .ext_flag = 1,
         },
         .controller_param_init_config={
             .angle_PID={
@@ -93,7 +94,7 @@ static void GimbalStateSet()
     {
     // 停止
     case GIMBAL_ZERO_FORCE:
-        MIMotorInstancetop(pitch_motor);
+        MIMotorInstancestop(pitch_motor);
         DJIMotorStop(yaw_motor);
         motor_init=0;
         break;

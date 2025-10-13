@@ -35,14 +35,14 @@ typedef enum
 typedef enum
 {
     MOTOR_FEED = 0,
-    OTHER_FEED,
-} Feedback_Source_e;
+    OTHER_FEED,            
+} Feedback_Source_e;     //反馈值来源
 
 /* 电机正反转标志 */
 typedef enum
 {
     MOTOR_DIRECTION_NORMAL = 0,
-    MOTOR_DIRECTION_REVERSE = 1
+    MOTOR_DIRECTION_REVERSE = 1     //电机反转
 } Motor_Reverse_Flag_e;
 
 /* 反馈量正反标志 */
@@ -74,7 +74,7 @@ typedef struct
 // 后续增加前馈数据指针
 typedef struct
 {
-    float *other_angle_feedback_ptr; // 其他反馈来源的反馈数据指针
+    float *other_angle_feedback_ptr; // 其他角度反馈来源的反馈数据指针
     float *other_speed_feedback_ptr;
     float *speed_feedforward_ptr;
     float *current_feedforward_ptr;
@@ -110,16 +110,16 @@ typedef struct
     float *speed_feedforward_ptr;   // 速度前馈数据指针
     float *current_feedforward_ptr; // 电流前馈数据指针
 
-    PID_Init_Config_s current_PID;
-    PID_Init_Config_s speed_PID;
-    PID_Init_Config_s angle_PID;
+    PID_Init_Config_s current_PID;      //电流环
+    PID_Init_Config_s speed_PID;        //速度环
+    PID_Init_Config_s angle_PID;        //位置环/角度环
 } Motor_Controller_Init_s;
 
 /* 用于初始化CAN电机的结构体,各类电机通用 */
 typedef struct
 {
     Motor_Controller_Init_s controller_param_init_config;
-    Motor_Control_Setting_s controller_setting_init_config;
+    Motor_Control_Setting_s controller_setting_init_config;   
     Motor_Type_e motor_type;
     CAN_Init_Config_s can_init_config;
 } Motor_Init_Config_s;
