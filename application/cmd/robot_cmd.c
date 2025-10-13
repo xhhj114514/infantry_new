@@ -176,6 +176,7 @@ static void VisionJudge()
 
 static void BasicSet()
 {
+    CalcOffsetAngle();
     GimbalPitchLimit();
     VisionJudge();
     //发射基本模式设定
