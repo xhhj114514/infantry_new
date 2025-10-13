@@ -33,8 +33,10 @@ void GimbalInit()
                 .DeadBand = 0.1,
                 .Improve = PID_Trapezoid_Intergral | PID_Integral_Limit | PID_Derivative_On_Measurement,
                 .IntegralLimit = 100,
+                .CoefA = 7,
+                .CoefB = 7,
                 .MaxOut = 330,
-                .FF_Gain = 300.0,
+                .FF_Gain = 350.0,
             },
             .speed_PID = {
                 .Kp = 45,  // 50
