@@ -99,21 +99,21 @@ static void CalcOffsetAngle()
     angle = gimbal_fetch_data.yaw_motor_single_round_angle; // 从云台获取的当前yaw电机单圈角度
 
 
-#if YAW_ECD_GREATER_THAN_4096                               // 如果大于180度
-    if (angle > yaw_align_angle && angle <= 180.0f + yaw_align_angle)
-        chassis_cmd_send.offset_angle = angle - yaw_align_angle;
-    else if (angle > 180.0f + yaw_align_angle)
-        chassis_cmd_send.offset_angle = angle - yaw_align_angle - 360.0f;
-    else
-        chassis_cmd_send.offset_angle = angle - yaw_align_angle;
-#else // 小于180度
+// #if YAW_ECD_GREATER_THAN_4096                               // 如果大于180度
+//     if (angle > yaw_align_angle && angle <= 180.0f + yaw_align_angle)
+//         chassis_cmd_send.offset_angle = angle - yaw_align_angle;
+//     else if (angle > 180.0f + yaw_align_angle)
+//         chassis_cmd_send.offset_angle = angle - yaw_align_angle - 360.0f;
+//     else
+//         chassis_cmd_send.offset_angle = angle - yaw_align_angle;
+// #else // 小于180度
     if (angle > YAW_ALIGN_ANGLE_1)
         chassis_cmd_send.offset_angle = angle - YAW_ALIGN_ANGLE_1;
-    else if (angle <= yaw_align_angle && angle >= YAW_ALIGN_ANGLE_1 - 180.0f)
+    else if (angle <= YAW_ALIGN_ANGLE_1 && angle >= YAW_ALIGN_ANGLE_1 - 180.0f)
         chassis_cmd_send.offset_angle = angle - YAW_ALIGN_ANGLE_1;
     else
         chassis_cmd_send.offset_angle = angle - YAW_ALIGN_ANGLE_1 + 360.0f;
-#endif
+// #endif
 }
 
 /**
@@ -198,7 +198,7 @@ static void ChassisRotateSet()
     {
         //底盘跟随
         case CHASSIS_FOLLOW_GIMBAL_YAW: 
-            chassis_cmd_send.wz =-20.0*abs(chassis_cmd_send.offset_angle)*chassis_cmd_send.offset_angle;
+            chassis_cmd_send.wz =-22.0*abs(chassis_cmd_send.offset_angle)*chassis_cmd_send.offset_angle;
         break;
         //小陀螺
         case CHASSIS_ROTATE: 
