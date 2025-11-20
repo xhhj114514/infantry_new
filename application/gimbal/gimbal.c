@@ -1,8 +1,5 @@
-//bsp
 #include "gimbal.h"
 #include "robot_def.h"
-
-//module
 #include "dji_motor.h"
 #include "ins_task.h"
 #include "message_center.h"
@@ -10,28 +7,18 @@
 #include "mi_motor.h"
 #include "bmi088.h"
 
-/************************************* GimbalUsed *************************************/
 static attitude_t *gimbal_IMU_data; // 云台IMU数据
 static DJIMotorInstance *yaw_motor;
 static MIMotorInstance *pitch_motor;
-static uint8_t motor_init=0;
 
-/************************************** CommUsed **************************************/
 static Publisher_t *gimbal_pub;                   // 云台应用消息发布者(云台反馈给cmd)
 static Subscriber_t *gimbal_sub;                  // cmd控制消息订阅者
 static Gimbal_Upload_Data_s gimbal_feedback_data; // 回传给cmd的云台状态信息
 static Gimbal_Ctrl_Cmd_s gimbal_cmd_recv;         // 来自cmd的控制信息
-
-
-/****************************************************************************************
-***************************************      Init     ***********************************
-*****************************************************************************************/
+static uint8_t motor_init=0;
 void GimbalInit()
 {
-/****************************************  IMUInit  **************************************/
     gimbal_IMU_data = INS_Init(); // IMU先初始化,获取姿态数据指针赋给yaw电机的其他数据来源
-
-/**************************************** MotorInit **************************************/
     // YAW
     Motor_Init_Config_s yaw_config = {
         .can_init_config = {
@@ -43,9 +30,9 @@ void GimbalInit()
                 .Kp = 15, // 8
                 .Ki = 2.5,
                 .Kd = 2.4,
+                .CoefA =7,
+                .CoefB =7,
                 .DeadBand = 0.1,
-                .CoefA=7,
-                .CoefB=7,
                 .Improve = PID_Trapezoid_Intergral | PID_Integral_Limit | PID_Derivative_On_Measurement,
                 .IntegralLimit = 100,
 
@@ -75,6 +62,7 @@ void GimbalInit()
     Motor_Init_Config_s pitch_config = {
         .can_init_config = {
             .can_handle = &hcan2,
+            .ext_flag=1,
         },
         .controller_param_init_config={
             .angle_PID={
@@ -92,71 +80,60 @@ void GimbalInit()
     pitch_motor = MIMotorInit(&pitch_config);
     //MIMotorModeSwitch(pitch_motor,1);
     //MIMotorSetPid(pitch_motor,pitch_motor->motor_controller.angle_PID.Kp,4,pitch_motor->motor_controller.speed_PID.Kp,pitch_motor->motor_controller.speed_PID.Ki);
-    MIMotorInstanceetMechPositionToZero(pitch_motor);
+    // MIMotorInstanceetMechPositionToZero(pitch_motor);
 
-/*****************************************PubSubCommInit*****************************************/
     gimbal_pub = PubRegister("gimbal_feed", sizeof(Gimbal_Upload_Data_s));
     gimbal_sub = SubRegister("gimbal_cmd", sizeof(Gimbal_Ctrl_Cmd_s));
 }
 
-
-/************************************************************************************************
-***************************************      Function      **************************************
-*************************************************************************************************/
-
-/***************************************** MoveGimbal ********************************************/
 static void GimbalStateSet()
 {
     switch (gimbal_cmd_recv.gimbal_mode)
     {
     // 停止
     case GIMBAL_ZERO_FORCE:
+        MIMotorInstancetop(pitch_motor);
         DJIMotorStop(yaw_motor);
-        MIMotorEnable(pitch_motor);
+        motor_init=0;
         break;
     case GIMBAL_GYRO_MODE: 
         DJIMotorEnable(yaw_motor);
         DJIMotorSetRef(yaw_motor,gimbal_cmd_recv.yaw);
+        MI_motor_LocationControl(pitch_motor,gimbal_cmd_recv.pitch,pitch_motor->motor_controller.angle_PID.Kp,pitch_motor->motor_controller.angle_PID.Kd);
         if(motor_init==0)
         {
-            gimbal_feedback_data.init_location=gimbal_IMU_data->Pitch;
+            //MIMotorModeSwitch(pitch_motor,1);
+        MIMotorEnable(pitch_motor);
+        //     gimbal_feedback_data.init_location=gimbal_IMU_data->Pitch;
+
+        //     //MIMotorSetPid(pitch_motor,pitch_motor->motor_controller.angle_PID.Kp,4,pitch_motor->motor_controller.speed_PID.Kp,pitch_motor->motor_controller.speed_PID.Ki);
             motor_init=1;
         }
-        MI_motor_LocationControl(pitch_motor,gimbal_cmd_recv.pitch,pitch_motor->motor_controller.angle_PID.Kp,pitch_motor->motor_controller.angle_PID.Kd);
-
-        /*
-        else
-        MiMotorSetRef(pitch_motor,gimbal_cmd_recv.pitch);
-        */
+        // else
+        // MiMotorSetRef(pitch_motor,gimbal_cmd_recv.pitch);
         break;
     default:
         break;
     }
 }
 
-/*****************************************FeedbackData*****************************************/
- static void SendGimbalData()
+
+
+static void SendGimbalData()
 {
     gimbal_feedback_data.gimbal_imu_data = *gimbal_IMU_data;
     gimbal_feedback_data.yaw_motor_single_round_angle = yaw_motor->measure.angle_single_round;
 }
 
-/************************************************************************************************
-***************************************        TASK        **************************************
-*************************************************************************************************/
 /* 机器人云台控制核心任务 */
 void GimbalTask()
 {
-/**************************************  GetRecvData  **************************************/
     // 获取云台控制数据
     SubGetMessage(gimbal_sub, &gimbal_cmd_recv);
-/**********************************     ControlGimbal     ***********************************/
-
     //云台启停
     GimbalStateSet();
-/**************************************    SendData    **************************************/
     // 设置反馈数据,主要是imu和yaw的ecd
-    SendGimbalData();    
+    SendGimbalData();
     // 推送消息
     PubPushMessage(gimbal_pub, (void *)&gimbal_feedback_data);
 }

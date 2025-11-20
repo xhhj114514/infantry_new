@@ -218,6 +218,7 @@ static void ChassisRotateSet()
  * @brief 基础设定，包括偏角计算、云台限位，超电判断，自瞄判断，以及发射基本模式设定
  *
  */
+ static uint8_t aaa;
 static void BasicSet()
 {
     CalcOffsetAngle();
@@ -231,6 +232,15 @@ static void BasicSet()
     shoot_cmd_send.friction_mode = FRICTION_ON;
     shoot_cmd_send.shoot_rate=8;
     chassis_cmd_send.power_limit=referee_data->GameRobotState.chassis_power_limit;
+
+    if(rc_data[TEMP].rc.dial>200)
+    {
+        HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_SET);
+    }
+    else
+    {
+        HAL_GPIO_WritePin(GPIOB, GPIO_PIN_12, GPIO_PIN_RESET);
+    }
 }
 
 /************************************** GimbalSet   **************************************/
@@ -262,13 +272,13 @@ static void ChassisRC()
 {
     chassis_cmd_send.vx =- 30.0f * (float)rc_data[TEMP].rc.rocker_left_y; // _水平方向
     chassis_cmd_send.vy =30.0f * (float)rc_data[TEMP].rc.rocker_left_x; // 竖直方向
-    chassis_cmd_send.chassis_rotate_buff=1;
+    chassis_cmd_send.chassis_rotate_buff=1.0;
     chassis_cmd_send.chassis_speed_buff=1;
     if (switch_is_down(rc_data[TEMP].rc.switch_left))
     {
         chassis_cmd_send.chassis_mode=CHASSIS_FOLLOW_GIMBAL_YAW;
     }
-    else
+    if(switch_is_mid(rc_data[TEMP].rc.switch_left))
         chassis_cmd_send.chassis_mode=CHASSIS_ROTATE;
 }
 
